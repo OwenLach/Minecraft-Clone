@@ -1,0 +1,43 @@
+# === CMake build artifacts ===
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/Makefile
+/install_manifest.txt
+
+# === Ninja build system files (if used) ===
+/build.ninja
+/.ninja_deps
+/.ninja_log
+
+# === Visual Studio Code ===
+.vscode/
+*.code-workspace
+
+# === IDE-specific or OS-specific ===
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# === Compiled object files and binaries ===
+*.o
+*.obj
+*.so
+*.a
+*.lib
+*.dll
+*.exe
+*.out
+
+# === Logs and temporary files ===
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# === macOS/Linux specific ===
+.DS_Store
+Thumbs.db
