@@ -27,6 +27,7 @@ target_include_directories(opengl_test PRIVATE
     libs/glad/include
     libs/glfw/include
     libs/stb
+    libs/glm
 )
 
 # Link libraries
