@@ -17,14 +17,19 @@ set_target_properties(glfw PROPERTIES
 )
 
 # Executable
-add_executable(opengl_test 
-    src/main.cpp
-    src/Application.cpp
-    src/Shader.cpp
-    src/InputManager.cpp
-    src/Camera.cpp
-    src/stb_image_impl.cpp
-)
+file(GLOB_RECURSE SOURCES "src/*.cpp")
+add_executable(opengl_test ${SOURCES})
+
+# add_executable(opengl_test 
+#     src/main.cpp
+#     src/Application.cpp
+#     src/Shader.cpp
+#     src/InputManager.cpp
+#     src/Camera.cpp
+#     src/VertexBuffer.cpp
+#     src/VertexArray.cpp
+#     src/stb_image_impl.cpp
+# )
 
 # Include directories
 target_include_directories(opengl_test PRIVATE
