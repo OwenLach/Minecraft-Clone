@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "Settings.h"
 #include "Shader.h"
+#include "VertexArray.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -136,24 +137,19 @@ void Application::render()
         glm::vec3(1.5f, 0.2f, -1.5f),
         glm::vec3(-1.3f, 1.0f, -1.5f)};
 
-    unsigned int VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
+    VertexBuffer vbo(vertices, sizeof(vertices));
+    vbo.bind();
 
-    glBindVertexArray(VAO);
+    VertexArray vao;
+    vao.bind();
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(0);
-    // texture coord attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    VertexBufferLayout layout;
+    layout.push<float>(3); // position
+    layout.push<float>(2); // text coords
+    vao.addBuffer(vbo, layout);
 
     // load and create a texture
-    unsigned int texture1, texture2;
+    unsigned int texture1;
     // texture 1
     glGenTextures(1, &texture1);
     glBindTexture(GL_TEXTURE_2D, texture1);
@@ -166,32 +162,10 @@ void Application::render()
     // load image, create texture and generate mipmaps
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-    unsigned char *data = stbi_load("../textures/container.jpg", &width, &height, &nrChannels, 0);
+    unsigned char *data = stbi_load("../textures/texture-atlas-minecraft.png", &width, &height, &nrChannels, 0);
     if (data)
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
-    {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data);
-    // texture 2
-    glGenTextures(1, &texture2);
-    glBindTexture(GL_TEXTURE_2D, texture2);
-    // set the texture wrapping parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load image, create texture and generate mipmaps
-    data = stbi_load("../textures/gto.png", &width, &height, &nrChannels, 0);
-    if (data)
-    {
-        // note that the got.png has transparency and thus an alpha channel, so make sure to tell OpenGL the data type is of GL_RGBA
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else
@@ -203,7 +177,6 @@ void Application::render()
     // tell opengl for each sampler to which texture unit it belongs to (only has to be done once)
     ourShader.use();
     ourShader.setInt("texture1", 0);
-    ourShader.setInt("texture2", 1);
 
     float lastFrame = 0;
     // render loop
@@ -224,9 +197,6 @@ void Application::render()
         // bind textures on corresponding texture units
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, texture2);
-
         // activate shader
         ourShader.use();
 
@@ -239,7 +209,7 @@ void Application::render()
         ourShader.setMat4("view", view);
 
         // use the VAO
-        glBindVertexArray(VAO);
+        vao.bind();
         for (unsigned int i = 0; i < 10; i++)
         {
             // calculate the model matrix for each shape and pass it to the shader
@@ -257,10 +227,6 @@ void Application::render()
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-
-    // optional: de-allocate all resources once they've outlived their purpose:
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     glfwTerminate();

@@ -1,3 +1,4 @@
+#pragma once
 #include "Camera.h"
 #include "InputManager.h"
 
