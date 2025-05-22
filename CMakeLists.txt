@@ -5,9 +5,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_RELEASE "-O0 -g")  # Turn off Release optimizations
 
-# Include source files
-file(GLOB_RECURSE SRC_FILES src/*.cpp)
-
 # GLAD
 add_library(glad libs/glad/glad.c)
 target_include_directories(glad PUBLIC libs/glad/include)
@@ -20,10 +17,18 @@ set_target_properties(glfw PROPERTIES
 )
 
 # Executable
-add_executable(opengl_test ${SRC_FILES})
+add_executable(opengl_test 
+    src/main.cpp
+    src/Application.cpp
+    src/Shader.cpp
+    src/InputManager.cpp
+    src/Camera.cpp
+    src/stb_image_impl.cpp
+)
 
 # Include directories
 target_include_directories(opengl_test PRIVATE
+    include
     libs/glad/include
     libs/glfw/include
     libs/stb
