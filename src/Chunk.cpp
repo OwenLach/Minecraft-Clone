@@ -39,3 +39,7 @@ void Chunk::renderChunk()
         }
     }
 }
+
+void Chunk::setupChunkMesh()
+{
+}

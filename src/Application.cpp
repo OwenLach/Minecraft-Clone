@@ -28,15 +28,11 @@ void Application::run()
         return;
     }
 
-    std::cout << "Initialized GLFW" << std::endl;
-
     if (!initOpenGL())
     {
         std::cerr << "Failed to initialize OpenGL" << std::endl;
         return;
     }
-    std::cout << "Initialized OpenGL" << std::endl;
-    std::cout << "About to render" << std::endl;
 
     render();
 }

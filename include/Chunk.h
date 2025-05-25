@@ -18,4 +18,6 @@ private:
     Shader &shader;
     TextureAtlas *textureAtlas;
     std::unique_ptr<Block> blocksPtr[Constants::CHUNK_SIZE_X][Constants::CHUNK_SIZE_Y][Constants::CHUNK_SIZE_Z];
+
+    void setupChunkMesh();
 };

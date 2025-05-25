@@ -36,7 +36,7 @@ public:
 
 private:
     VertexArray vao;
-    std::unique_ptr<VertexBuffer> vboPtr;
+    VertexBuffer vbo;
 
     Shader *shader;
 

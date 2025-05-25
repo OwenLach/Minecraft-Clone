@@ -15,16 +15,15 @@ class VertexBuffer
 public:
     /**
      * @brief Constructs a VertexBuffer and uploads data to the GPU.
-     * @param data Pointer to an array of floats representing vertex data.
-     * @param size Size of the data in bytes.
      */
-    VertexBuffer(const float *data, int size);
+    VertexBuffer();
 
     /**
      * @brief Destructor that deletes the OpenGL buffer.
      */
     ~VertexBuffer();
 
+    void setData(const float *data, int size);
     /**
      * @brief Binds the VertexBuffer (makes it the active GL_ARRAY_BUFFER).
      */
@@ -36,5 +35,6 @@ public:
     void unbind() const;
 
 private:
+    bool dataSet;
     unsigned int ID;
 };
