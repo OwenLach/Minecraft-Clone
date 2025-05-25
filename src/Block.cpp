@@ -14,13 +14,13 @@ Block::Block(BlockType type, TextureAtlas *atlas, glm::vec3 pos, Shader *shader)
 void Block::setupMesh()
 {
     vao.bind();
-    vboPtr = std::make_unique<VertexBuffer>(verticies.data(), verticies.size() * sizeof(float));
-    vboPtr->bind();
+    vbo.setData(verticies.data(), verticies.size() * sizeof(float));
+    vbo.bind();
 
     VertexBufferLayout layout;
     layout.push<float>(3); // position
     layout.push<float>(2); // texture coords
-    vao.addBuffer(*vboPtr, layout);
+    vao.addBuffer(vbo, layout);
 }
 
 void Block::render()
