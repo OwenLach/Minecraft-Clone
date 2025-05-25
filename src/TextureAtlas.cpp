@@ -59,6 +59,10 @@ void TextureAtlas::initIndicies()
     blockIndicies[BlockType::Cobblestone] = {glm::vec2(0, 1),  // top
                                              glm::vec2(0, 1),  // side
                                              glm::vec2(0, 1)}; // bottom
+
+    blockIndicies[BlockType::CryingObsidian] = {glm::vec2(5, 2),  // top
+                                                glm::vec2(5, 2),  // side
+                                                glm::vec2(5, 2)}; // bottom
 }
 
 UVCoords TextureAtlas::getTileUVs(int tileX, int tileY)

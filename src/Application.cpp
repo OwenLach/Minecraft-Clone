@@ -5,6 +5,7 @@
 #include "TextureAtlas.h"
 #include "BlockTypes.h"
 #include "Block.h"
+#include "Chunk.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -27,11 +28,15 @@ void Application::run()
         return;
     }
 
+    std::cout << "Initialized GLFW" << std::endl;
+
     if (!initOpenGL())
     {
         std::cerr << "Failed to initialize OpenGL" << std::endl;
         return;
     }
+    std::cout << "Initialized OpenGL" << std::endl;
+    std::cout << "About to render" << std::endl;
 
     render();
 }
@@ -74,36 +79,22 @@ bool Application::initOpenGL()
 
     // enable depth testing
     glEnable(GL_DEPTH_TEST);
-
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
     return true;
 }
 
 void Application::render()
 {
-    Shader ourShader("../shaders/vShader.glsl", "../shaders/fShader.glsl");
-
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
+    Shader shader("../shaders/vShader.glsl", "../shaders/fShader.glsl");
+    shader.use();
     TextureAtlas textureAtlas;
-    Block grass(BlockType::Grass, &textureAtlas, glm::vec3(0.0f, 0.0f, 0.0f));
-    std::vector<float> verticies = grass.getVerticies();
 
-    VertexBuffer vbo(verticies.data(), verticies.size() * sizeof(float));
-    vbo.bind();
-
-    VertexArray vao;
-    vao.bind();
-
-    VertexBufferLayout layout;
-    layout.push<float>(3); // position
-    layout.push<float>(2); // text coords
-    vao.addBuffer(vbo, layout);
-
-    ourShader.use();
-    ourShader.setInt("texture1", 0);
+    Chunk chunk(shader, &textureAtlas); // <- likely crash here
 
     float lastFrame = 0;
     // render loop
+
     while (!glfwWindowShouldClose(window))
     {
         // calculate delta time
@@ -115,31 +106,25 @@ void Application::render()
         inputManager.processKeyboard(window, deltaTime);
 
         // render
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.529f, 0.808f, 0.922f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // bind textures on corresponding texture units
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureAtlas.ID);
+
         // activate shader
-        ourShader.use();
+        shader.use();
 
         // pass projection matrix to shader (note as projection matricies rarely change, there's no need to do this per frame)
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 100.0f);
-        ourShader.setMat4("projection", projection);
+        shader.setMat4("projection", projection);
 
         // set the view matrix
         glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("view", view);
+        shader.setMat4("view", view);
 
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        ourShader.setMat4("model", model);
+        chunk.renderChunk();
 
-        // use the VAO
-        vao.bind();
-
-        glDrawArrays(GL_TRIANGLES, 0, 36);
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         glfwSwapBuffers(window);
         glfwPollEvents();
