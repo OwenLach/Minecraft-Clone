@@ -3,9 +3,11 @@
 
 enum BlockType
 {
+    Air,
     Grass,
     Stone,
     Cobblestone,
+    CryingObsidian
 };
 
 struct UVCoords
