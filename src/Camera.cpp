@@ -5,8 +5,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(Settings::PLAYER_SPEED),
-      MouseSensitivity(Settings::MOUSE_SENSITIVITY), Zoom(Settings::ZOOM), ZoomSensitivity(Settings::ZOOM_SENSITIVITY)
+    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(Constants::PLAYER_SPEED),
+      MouseSensitivity(Constants::MOUSE_SENSITIVITY), Zoom(Constants::ZOOM), ZoomSensitivity(Constants::ZOOM_SENSITIVITY)
 {
     Position = position;
     WorldUp = up;

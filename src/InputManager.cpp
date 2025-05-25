@@ -1,8 +1,8 @@
 #include "InputManager.h"
-#include "Settings.h"
+#include "Constants.h"
 
 InputManager::InputManager(Camera *camera)
-    : camera(camera), firstMouse(true), lastX(Settings::SCREEN_W / 2), lastY(Settings::SCREEN_H / 2)
+    : camera(camera), firstMouse(true), lastX(Constants::SCREEN_W / 2), lastY(Constants::SCREEN_H / 2)
 {
 }
 
