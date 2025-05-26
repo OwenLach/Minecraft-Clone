@@ -75,18 +75,15 @@ bool Application::initOpenGL()
 
     // enable depth testing
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
+
     return true;
 }
 
 void Application::render()
 {
     Shader shader("../shaders/vShader.glsl", "../shaders/fShader.glsl");
-    shader.use();
     TextureAtlas textureAtlas;
-
-    Chunk chunk(shader, &textureAtlas); // <- likely crash here
+    Chunk chunk(shader, &textureAtlas);
 
     float lastFrame = 0;
     // render loop

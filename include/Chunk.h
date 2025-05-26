@@ -7,6 +7,9 @@
 #include "Constants.h"
 #include "TextureAtlas.h"
 #include "Shader.h"
+#include "VertexArray.h"
+#include "VertexBuffer.h"
+#include "VertexBufferLayout.h"
 
 class Chunk
 {
@@ -15,9 +18,11 @@ public:
     void renderChunk();
 
 private:
+    VertexArray vao;
+    VertexBuffer vbo;
     Shader &shader;
     TextureAtlas *textureAtlas;
-    std::unique_ptr<Block> blocksPtr[Constants::CHUNK_SIZE_X][Constants::CHUNK_SIZE_Y][Constants::CHUNK_SIZE_Z];
+    std::vector<float> blockVerticies;
 
     void setupChunkMesh();
 };
