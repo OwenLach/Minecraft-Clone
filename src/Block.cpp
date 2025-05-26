@@ -3,109 +3,122 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 
-Block::Block(BlockType type, TextureAtlas *atlas, glm::vec3 pos, Shader *shader)
-    : block_type(type), textureAtlas(atlas), position(pos), shader(shader)
+Block::Block(BlockType type, glm::vec3 pos)
+    : block_type(type), position(pos)
 {
-    initBlockTextures();
-    initVerticies();
-    setupMesh();
 }
 
-void Block::setupMesh()
+std::vector<float> Block::generateVerticies(BlockTextureUVs textureUVs)
 {
-    vao.bind();
-    vbo.setData(verticies.data(), verticies.size() * sizeof(float));
-    vbo.bind();
-
-    VertexBufferLayout layout;
-    layout.push<float>(3); // position
-    layout.push<float>(2); // texture coords
-    vao.addBuffer(vbo, layout);
-}
-
-void Block::render()
-{
-    if (!shader)
-    {
-        std::cerr << "No shader in Block.cpp" << std::endl;
-        return;
-    }
-
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
-    shader->setMat4("model", model);
-
-    vao.bind();
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-}
-
-std::vector<float> Block::getVerticies()
-{
-    return verticies;
-}
-
-void Block::initBlockTextures()
-{
-    if (!textureAtlas)
-    {
-        std::cerr << "ERROR: textureAtlas is null in Block::initBlockTextures()\n";
-        return;
-    }
-
-    textureUVs = textureAtlas->getUVcoords(block_type);
-}
-
-void Block::initVerticies()
-{
-    verticies = {
+    // Vertex positions for one cube face, repeated for each face
+    static const std::vector<glm::vec3> basePositions = {
         // Back face
-        -0.5f, -0.5f, -0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
-        0.5f, -0.5f, -0.5f, textureUVs.side.bottomRight.x, textureUVs.side.bottomRight.y,
-        0.5f, 0.5f, -0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
-        0.5f, 0.5f, -0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
-        -0.5f, 0.5f, -0.5f, textureUVs.side.topLeft.x, textureUVs.side.topLeft.y,
-        -0.5f, -0.5f, -0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
+        {-0.5f, -0.5f, -0.5f},
+        {0.5f, -0.5f, -0.5f},
+        {0.5f, 0.5f, -0.5f},
+        {0.5f, 0.5f, -0.5f},
+        {-0.5f, 0.5f, -0.5f},
+        {-0.5f, -0.5f, -0.5f},
 
         // Front face
-        -0.5f, -0.5f, 0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
-        0.5f, -0.5f, 0.5f, textureUVs.side.bottomRight.x, textureUVs.side.bottomRight.y,
-        0.5f, 0.5f, 0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
-        0.5f, 0.5f, 0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
-        -0.5f, 0.5f, 0.5f, textureUVs.side.topLeft.x, textureUVs.side.topLeft.y,
-        -0.5f, -0.5f, 0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
+        {-0.5f, -0.5f, 0.5f},
+        {0.5f, -0.5f, 0.5f},
+        {0.5f, 0.5f, 0.5f},
+        {0.5f, 0.5f, 0.5f},
+        {-0.5f, 0.5f, 0.5f},
+        {-0.5f, -0.5f, 0.5f},
 
         // Left face
-        -0.5f, 0.5f, 0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
-        -0.5f, 0.5f, -0.5f, textureUVs.side.topLeft.x, textureUVs.side.topLeft.y,
-        -0.5f, -0.5f, -0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
-        -0.5f, -0.5f, -0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
-        -0.5f, -0.5f, 0.5f, textureUVs.side.bottomRight.x, textureUVs.side.bottomRight.y,
-        -0.5f, 0.5f, 0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
+        {-0.5f, 0.5f, 0.5f},
+        {-0.5f, 0.5f, -0.5f},
+        {-0.5f, -0.5f, -0.5f},
+        {-0.5f, -0.5f, -0.5f},
+        {-0.5f, -0.5f, 0.5f},
+        {-0.5f, 0.5f, 0.5f},
 
         // Right face
-        0.5f, 0.5f, 0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
-        0.5f, 0.5f, -0.5f, textureUVs.side.topLeft.x, textureUVs.side.topLeft.y,
-        0.5f, -0.5f, -0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
-        0.5f, -0.5f, -0.5f, textureUVs.side.bottomLeft.x, textureUVs.side.bottomLeft.y,
-        0.5f, -0.5f, 0.5f, textureUVs.side.bottomRight.x, textureUVs.side.bottomRight.y,
-        0.5f, 0.5f, 0.5f, textureUVs.side.topRight.x, textureUVs.side.topRight.y,
+        {0.5f, 0.5f, 0.5f},
+        {0.5f, 0.5f, -0.5f},
+        {0.5f, -0.5f, -0.5f},
+        {0.5f, -0.5f, -0.5f},
+        {0.5f, -0.5f, 0.5f},
+        {0.5f, 0.5f, 0.5f},
 
         // Bottom face
-        -0.5f, -0.5f, -0.5f, textureUVs.bottom.bottomLeft.x, textureUVs.bottom.bottomLeft.y,
-        0.5f, -0.5f, -0.5f, textureUVs.bottom.bottomRight.x, textureUVs.bottom.bottomRight.y,
-        0.5f, -0.5f, 0.5f, textureUVs.bottom.topRight.x, textureUVs.bottom.topRight.y,
-        0.5f, -0.5f, 0.5f, textureUVs.bottom.topRight.x, textureUVs.bottom.topRight.y,
-        -0.5f, -0.5f, 0.5f, textureUVs.bottom.topLeft.x, textureUVs.bottom.topLeft.y,
-        -0.5f, -0.5f, -0.5f, textureUVs.bottom.bottomLeft.x, textureUVs.bottom.bottomLeft.y,
+        {-0.5f, -0.5f, -0.5f},
+        {0.5f, -0.5f, -0.5f},
+        {0.5f, -0.5f, 0.5f},
+        {0.5f, -0.5f, 0.5f},
+        {-0.5f, -0.5f, 0.5f},
+        {-0.5f, -0.5f, -0.5f},
 
         // Top face
-        -0.5f, 0.5f, -0.5f, textureUVs.top.bottomLeft.x, textureUVs.top.bottomLeft.y,
-        0.5f, 0.5f, -0.5f, textureUVs.top.bottomRight.x, textureUVs.top.bottomRight.y,
-        0.5f, 0.5f, 0.5f, textureUVs.top.topRight.x, textureUVs.top.topRight.y,
-        0.5f, 0.5f, 0.5f, textureUVs.top.topRight.x, textureUVs.top.topRight.y,
-        -0.5f, 0.5f, 0.5f, textureUVs.top.topLeft.x, textureUVs.top.topLeft.y,
-        -0.5f, 0.5f, -0.5f, textureUVs.top.bottomLeft.x, textureUVs.top.bottomLeft.y};
+        {-0.5f, 0.5f, -0.5f},
+        {0.5f, 0.5f, -0.5f},
+        {0.5f, 0.5f, 0.5f},
+        {0.5f, 0.5f, 0.5f},
+        {-0.5f, 0.5f, 0.5f},
+        {-0.5f, 0.5f, -0.5f},
+    };
+
+    // Corresponding UVs
+    std::vector<glm::vec2> uvs = {
+        textureUVs.side.bottomLeft,
+        textureUVs.side.bottomRight,
+        textureUVs.side.topRight,
+        textureUVs.side.topRight,
+        textureUVs.side.topLeft,
+        textureUVs.side.bottomLeft,
+
+        textureUVs.side.bottomLeft,
+        textureUVs.side.bottomRight,
+        textureUVs.side.topRight,
+        textureUVs.side.topRight,
+        textureUVs.side.topLeft,
+        textureUVs.side.bottomLeft,
+
+        textureUVs.side.topRight,
+        textureUVs.side.topLeft,
+        textureUVs.side.bottomLeft,
+        textureUVs.side.bottomLeft,
+        textureUVs.side.bottomRight,
+        textureUVs.side.topRight,
+
+        textureUVs.side.topRight,
+        textureUVs.side.topLeft,
+        textureUVs.side.bottomLeft,
+        textureUVs.side.bottomLeft,
+        textureUVs.side.bottomRight,
+        textureUVs.side.topRight,
+
+        textureUVs.bottom.bottomLeft,
+        textureUVs.bottom.bottomRight,
+        textureUVs.bottom.topRight,
+        textureUVs.bottom.topRight,
+        textureUVs.bottom.topLeft,
+        textureUVs.bottom.bottomLeft,
+
+        textureUVs.top.bottomLeft,
+        textureUVs.top.bottomRight,
+        textureUVs.top.topRight,
+        textureUVs.top.topRight,
+        textureUVs.top.topLeft,
+        textureUVs.top.bottomLeft,
+    };
+
+    std::vector<float> verticies;
+    for (unsigned int i = 0; i < basePositions.size(); i++)
+    {
+        // calculate block position
+        glm::vec3 blockPos = basePositions[i] + position;
+
+        verticies.push_back(blockPos.x);
+        verticies.push_back(blockPos.y);
+        verticies.push_back(blockPos.z);
+
+        verticies.push_back(uvs[i].x);
+        verticies.push_back(uvs[i].y);
+    }
+
+    return verticies;
 }
-
-void Block::setPosition(glm::vec3 pos) { position = pos; }
-
-glm::vec3 Block::getPosition() { return position; }
