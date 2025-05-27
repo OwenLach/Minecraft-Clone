@@ -2,123 +2,49 @@
 #include "Block.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
+#include <unordered_map>
+#include <array>
 
-Block::Block(BlockType type, glm::vec3 pos)
-    : block_type(type), position(pos)
+Block::Block() : type(BlockType::Air), position(glm::vec3(0.0f))
 {
 }
 
-std::vector<float> Block::generateVerticies(BlockTextureUVs textureUVs)
+Block::Block(BlockType type, glm::vec3 pos) : type(type), position(pos)
 {
-    // Vertex positions for one cube face, repeated for each face
-    static const std::vector<glm::vec3> basePositions = {
-        // Back face
-        {-0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, -0.5f},
-        {0.5f, 0.5f, -0.5f},
-        {0.5f, 0.5f, -0.5f},
-        {-0.5f, 0.5f, -0.5f},
-        {-0.5f, -0.5f, -0.5f},
+}
 
-        // Front face
-        {-0.5f, -0.5f, 0.5f},
-        {0.5f, -0.5f, 0.5f},
-        {0.5f, 0.5f, 0.5f},
-        {0.5f, 0.5f, 0.5f},
-        {-0.5f, 0.5f, 0.5f},
-        {-0.5f, -0.5f, 0.5f},
+std::vector<float> Block::generateFacevertices(BlockFaces face, const std::vector<glm::vec2> &faceUVs) const
+{
+    using Vec3 = glm::vec3;
+    using Vec2 = glm::vec2;
 
-        // Left face
-        {-0.5f, 0.5f, 0.5f},
-        {-0.5f, 0.5f, -0.5f},
-        {-0.5f, -0.5f, -0.5f},
-        {-0.5f, -0.5f, -0.5f},
-        {-0.5f, -0.5f, 0.5f},
-        {-0.5f, 0.5f, 0.5f},
-
-        // Right face
-        {0.5f, 0.5f, 0.5f},
-        {0.5f, 0.5f, -0.5f},
-        {0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, 0.5f},
-        {0.5f, 0.5f, 0.5f},
-
-        // Bottom face
-        {-0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, 0.5f},
-        {0.5f, -0.5f, 0.5f},
-        {-0.5f, -0.5f, 0.5f},
-        {-0.5f, -0.5f, -0.5f},
-
-        // Top face
-        {-0.5f, 0.5f, -0.5f},
-        {0.5f, 0.5f, -0.5f},
-        {0.5f, 0.5f, 0.5f},
-        {0.5f, 0.5f, 0.5f},
-        {-0.5f, 0.5f, 0.5f},
-        {-0.5f, 0.5f, -0.5f},
+    static const std::unordered_map<BlockFaces, std::array<Vec3, 4>> faceCorners = {
+        {BlockFaces::Front, {Vec3(-0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f)}},
+        {BlockFaces::Back, {Vec3(0.5f, -0.5f, -0.5f), Vec3(-0.5f, -0.5f, -0.5f), Vec3(-0.5f, 0.5f, -0.5f), Vec3(0.5f, 0.5f, -0.5f)}},
+        {BlockFaces::Left, {Vec3(-0.5f, -0.5f, -0.5f), Vec3(-0.5f, -0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, -0.5f)}},
+        {BlockFaces::Right, {Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, -0.5f), Vec3(0.5f, 0.5f, -0.5f), Vec3(0.5f, 0.5f, 0.5f)}},
+        {BlockFaces::Top, {Vec3(-0.5f, 0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(0.5f, 0.5f, -0.5f), Vec3(-0.5f, 0.5f, -0.5f)}},
+        {BlockFaces::Bottom, {Vec3(-0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(-0.5f, -0.5f, 0.5f)}},
     };
 
-    // Corresponding UVs
-    std::vector<glm::vec2> uvs = {
-        textureUVs.side.bottomLeft,
-        textureUVs.side.bottomRight,
-        textureUVs.side.topRight,
-        textureUVs.side.topRight,
-        textureUVs.side.topLeft,
-        textureUVs.side.bottomLeft,
+    static const std::array<unsigned int, 6> quadIndices = {0, 1, 2, 2, 3, 0};
 
-        textureUVs.side.bottomLeft,
-        textureUVs.side.bottomRight,
-        textureUVs.side.topRight,
-        textureUVs.side.topRight,
-        textureUVs.side.topLeft,
-        textureUVs.side.bottomLeft,
+    // Error if invalid UV count
+    if (faceUVs.size() != 6)
+        throw std::runtime_error("faceUVs must contain exactly 6 elements (6 vertices)");
 
-        textureUVs.side.topRight,
-        textureUVs.side.topLeft,
-        textureUVs.side.bottomLeft,
-        textureUVs.side.bottomLeft,
-        textureUVs.side.bottomRight,
-        textureUVs.side.topRight,
+    const auto &corners = faceCorners.at(face);
 
-        textureUVs.side.topRight,
-        textureUVs.side.topLeft,
-        textureUVs.side.bottomLeft,
-        textureUVs.side.bottomLeft,
-        textureUVs.side.bottomRight,
-        textureUVs.side.topRight,
+    std::vector<float> vertices;
+    vertices.reserve(6 * (3 + 2)); // 6 vertices, each with 3 position + 2 UV
 
-        textureUVs.bottom.bottomLeft,
-        textureUVs.bottom.bottomRight,
-        textureUVs.bottom.topRight,
-        textureUVs.bottom.topRight,
-        textureUVs.bottom.topLeft,
-        textureUVs.bottom.bottomLeft,
-
-        textureUVs.top.bottomLeft,
-        textureUVs.top.bottomRight,
-        textureUVs.top.topRight,
-        textureUVs.top.topRight,
-        textureUVs.top.topLeft,
-        textureUVs.top.bottomLeft,
-    };
-
-    std::vector<float> verticies;
-    for (unsigned int i = 0; i < basePositions.size(); i++)
+    for (size_t i = 0; i < 6; ++i)
     {
-        // calculate block position
-        glm::vec3 blockPos = basePositions[i] + position;
+        const Vec3 &pos = corners[quadIndices[i]] + position;
+        const Vec2 &uv = faceUVs[i];
 
-        verticies.push_back(blockPos.x);
-        verticies.push_back(blockPos.y);
-        verticies.push_back(blockPos.z);
-
-        verticies.push_back(uvs[i].x);
-        verticies.push_back(uvs[i].y);
+        vertices.insert(vertices.end(), {pos.x, pos.y, pos.z, uv.x, uv.y});
     }
 
-    return verticies;
+    return vertices;
 }

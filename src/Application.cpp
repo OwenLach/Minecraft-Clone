@@ -73,9 +73,6 @@ bool Application::initOpenGL()
         return false;
     }
 
-    // enable depth testing
-    glEnable(GL_DEPTH_TEST);
-
     return true;
 }
 
@@ -101,6 +98,15 @@ void Application::render()
         // render
         glClearColor(0.529f, 0.808f, 0.922f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // enable depth testing and cull facing
+        glEnable(GL_DEPTH_TEST);
+
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK); // Cull back-facing triangles
+        glFrontFace(GL_CCW); // Counter-clockwise is front
+
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureAtlas.ID);

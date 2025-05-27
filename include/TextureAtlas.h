@@ -3,6 +3,7 @@
 #include "BlockTypes.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
+#include <vector>
 
 class TextureAtlas
 {
@@ -13,11 +14,11 @@ public:
     int tileSize;
 
     TextureAtlas();
-    // returns the top, side, and bottom uv coords for each face of a block
-    BlockTextureUVs getUVcoords(BlockType type);
+    std::vector<glm::vec2> getFaceUVs(BlockType type, BlockFaces face);
 
 private:
     std::unordered_map<BlockType, BlockTextureAtlasIndicies> blockIndicies;
+
     void initIndicies();
-    UVCoords getTileUVs(int tileX, int tileY);
+    std::vector<glm::vec2> getTileUVs(int tileX, int tileY);
 };
