@@ -10,19 +10,14 @@ enum BlockType
     CryingObsidian
 };
 
-struct UVCoords
+enum class BlockFaces
 {
-    glm::vec2 topLeft;
-    glm::vec2 topRight;
-    glm::vec2 bottomLeft;
-    glm::vec2 bottomRight;
-};
-
-struct BlockTextureUVs
-{
-    UVCoords top;
-    UVCoords side;
-    UVCoords bottom;
+    Right,
+    Left,
+    Top,
+    Bottom,
+    Front,
+    Back
 };
 
 struct BlockTextureAtlasIndicies
