@@ -6,6 +6,7 @@
 #include "BlockTypes.h"
 #include "Block.h"
 #include "Chunk.h"
+#include "ImGuiManager.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -80,13 +81,15 @@ void Application::render()
 {
     Shader shader("../shaders/vShader.glsl", "../shaders/fShader.glsl");
     TextureAtlas textureAtlas;
-    Chunk chunk(shader, &textureAtlas);
-
+    Chunk chunk(shader, &textureAtlas, glm::vec3(-10, -Constants::CHUNK_SIZE_Y, -20));
+    // World world()
     float lastFrame = 0;
-    // render loop
 
+    ImGuiManager imguiManager(window);
+    // render loop
     while (!glfwWindowShouldClose(window))
     {
+
         // calculate delta time
         float currentFrame = static_cast<float>(glfwGetTime());
         float deltaTime = currentFrame - lastFrame;
@@ -94,6 +97,9 @@ void Application::render()
 
         // input
         inputManager.processKeyboard(window, deltaTime);
+
+        // imgui
+        imguiManager.update();
 
         // render
         glClearColor(0.529f, 0.808f, 0.922f, 1.0f);
@@ -105,6 +111,17 @@ void Application::render()
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK); // Cull back-facing triangles
         glFrontFace(GL_CCW); // Counter-clockwise is front
+
+        ImGui::Begin("Stats:");
+
+        // Calculate FPS from deltaTime
+        float fps = 1.0f / deltaTime;
+        ImGui::Text("FPS: %.1f", fps);
+
+        // Display camera position
+        glm::vec3 camPos = camera.Position;
+        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
+        ImGui::End();
 
         // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -123,6 +140,8 @@ void Application::render()
         shader.setMat4("view", view);
 
         chunk.renderChunk();
+
+        imguiManager.render();
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         glfwSwapBuffers(window);

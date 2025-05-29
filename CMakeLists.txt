@@ -16,20 +16,22 @@ set_target_properties(glfw PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/libs/glfw/include"
 )
 
+# ImGui
+file(GLOB IMGUI_SOURCES
+    libs/imgui/*.cpp
+    libs/imgui/backends/imgui_impl_glfw.cpp
+    libs/imgui/backends/imgui_impl_opengl3.cpp
+)
+add_library(imgui ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC
+    libs/imgui
+    libs/imgui/backends
+    "${CMAKE_SOURCE_DIR}/libs/glfw/include" 
+)
+
 # Executable
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 add_executable(opengl_test ${SOURCES})
-
-# add_executable(opengl_test 
-#     src/main.cpp
-#     src/Application.cpp
-#     src/Shader.cpp
-#     src/InputManager.cpp
-#     src/Camera.cpp
-#     src/VertexBuffer.cpp
-#     src/VertexArray.cpp
-#     src/stb_image_impl.cpp
-# )
 
 # Include directories
 target_include_directories(opengl_test PRIVATE
@@ -44,5 +46,6 @@ target_include_directories(opengl_test PRIVATE
 target_link_libraries(opengl_test
     glad
     glfw
+    imgui
     opengl32
 )

@@ -20,7 +20,7 @@ struct Vertex
 class Chunk
 {
 public:
-    Chunk(Shader &shader, TextureAtlas *atlas);
+    Chunk(Shader &shader, TextureAtlas *atlas, glm::vec3 pos);
     void renderChunk();
     bool blockInBounds(glm::ivec3 pos) const;
 
@@ -48,7 +48,7 @@ private:
     TextureAtlas *textureAtlas;
     std::vector<Vertex> vertices;
     std::vector<Block> blocks;
-
+    glm::vec3 worldPos;
     /**
      * @brief Sets up the OpenGL vertex array object (VAO) and defines the layout
      * of the vertex data for the chunk. This function is typically called
