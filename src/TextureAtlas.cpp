@@ -6,7 +6,7 @@
 #include <iostream>
 
 TextureAtlas::TextureAtlas()
-    : tileSize(16)
+    : tileSize(16), ID(0), atlasWidth(0), atlasHeight(0)
 {
     glGenTextures(1, &ID);
     glBindTexture(GL_TEXTURE_2D, ID);

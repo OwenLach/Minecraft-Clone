@@ -1,12 +1,9 @@
 #include "Application.h"
 #include "Constants.h"
-#include "Shader.h"
 #include "VertexArray.h"
 #include "TextureAtlas.h"
 #include "BlockTypes.h"
 #include "Block.h"
-#include "Chunk.h"
-#include "ImGuiManager.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -17,25 +14,50 @@
 #include <iostream>
 
 Application::Application()
-    : camera(glm::vec3(0.0f, 0.0f, 3.0f)), inputManager(&camera)
+    : lastFrame(0.0f),
+      fpsTimer(0.0f),
+      frameCount(0),
+      fpsToDisplay(0.0f)
 {
 }
 
 void Application::run()
 {
-    if (!initWindow())
+
+    if (!init())
     {
-        std::cerr << "Failed to initialize GLFW window" << std::endl;
+        std::cerr << "Failed to initialize application!" << std::endl;
         return;
     }
+    mainLoop();
+    shutdown();
+}
 
-    if (!initOpenGL())
+bool Application::init()
+{
+    if (!initWindow() || !initOpenGL())
     {
-        std::cerr << "Failed to initialize OpenGL" << std::endl;
-        return;
+        std::cerr << "Error initializing GLFW or OpenGl" << std::endl;
+        return false;
     }
 
-    render();
+    camera = std::make_unique<Camera>(glm::vec3(0.0f));
+    inputManager = std::make_unique<InputManager>(camera.get());
+
+    // set camera to the window
+    glfwSetWindowUserPointer(window, inputManager.get());
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    glfwSetFramebufferSizeCallback(window, InputManager::framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, InputManager::mouse_callback);
+    glfwSetScrollCallback(window, InputManager::scroll_callback);
+
+    textureAtlas = std::make_unique<TextureAtlas>();
+    shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
+    chunk = std::make_unique<Chunk>(*shader, textureAtlas.get(), glm::vec3(0 - Constants::CHUNK_SIZE_X / 2, -Constants::CHUNK_SIZE_Y, 0 - Constants::CHUNK_SIZE_Z / 2));
+    imguiManager = std::make_unique<ImGuiManager>(window);
+
+    return true;
 }
 
 bool Application::initWindow()
@@ -55,13 +77,6 @@ bool Application::initWindow()
     }
 
     glfwMakeContextCurrent(window);
-    // set camera to the window
-    glfwSetWindowUserPointer(window, &inputManager);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    glfwSetFramebufferSizeCallback(window, InputManager::framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, InputManager::mouse_callback);
-    glfwSetScrollCallback(window, InputManager::scroll_callback);
 
     return true;
 }
@@ -77,77 +92,115 @@ bool Application::initOpenGL()
     return true;
 }
 
-void Application::render()
+void Application::shutdown()
 {
-    Shader shader("../shaders/vShader.glsl", "../shaders/fShader.glsl");
-    TextureAtlas textureAtlas;
-    Chunk chunk(shader, &textureAtlas, glm::vec3(-10, -Constants::CHUNK_SIZE_Y, -20));
-    // World world()
-    float lastFrame = 0;
+    glfwTerminate();
+}
 
-    ImGuiManager imguiManager(window);
-    // render loop
+void Application::mainLoop()
+{
+
     while (!glfwWindowShouldClose(window))
     {
 
-        // calculate delta time
-        float currentFrame = static_cast<float>(glfwGetTime());
-        float deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        float dt = getDeltaTime();
 
-        // input
-        inputManager.processKeyboard(window, deltaTime);
-
-        // imgui
-        imguiManager.update();
-
-        // render
-        glClearColor(0.529f, 0.808f, 0.922f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // enable depth testing and cull facing
-        glEnable(GL_DEPTH_TEST);
-
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK); // Cull back-facing triangles
-        glFrontFace(GL_CCW); // Counter-clockwise is front
-
-        ImGui::Begin("Stats:");
-
-        // Calculate FPS from deltaTime
-        float fps = 1.0f / deltaTime;
-        ImGui::Text("FPS: %.1f", fps);
-
-        // Display camera position
-        glm::vec3 camPos = camera.Position;
-        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
-        ImGui::End();
-
-        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textureAtlas.ID);
-
-        // activate shader
-        shader.use();
-
-        // pass projection matrix to shader (note as projection matricies rarely change, there's no need to do this per frame)
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 100.0f);
-        shader.setMat4("projection", projection);
-
-        // set the view matrix
-        glm::mat4 view = camera.GetViewMatrix();
-        shader.setMat4("view", view);
-
-        chunk.renderChunk();
-
-        imguiManager.render();
-
+        processInput(dt);
+        update(dt);
+        render();
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+}
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    glfwTerminate();
+void Application::render()
+{
+    setGLRenderState();
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    glClearColor(0.529f, 0.808f, 0.922f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureAtlas->ID);
+
+    // activate shader
+    shader->use();
+
+    // pass projection matrix to shader (note as projection matricies rarely change, there's no need to do this per frame)
+    glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 100.0f);
+    shader->setMat4("projection", projection);
+
+    // set the view matrix
+    glm::mat4 view = camera->GetViewMatrix();
+    shader->setMat4("view", view);
+
+    chunk->renderChunk();
+    imguiManager->render();
+}
+
+void Application::update(const float dt)
+{
+    updateFPS(dt);
+    imguiManager->update();
+    setupImGuiUI();
+}
+
+void Application::setGLRenderState()
+{
+    // enable depth testing and cull facing
+    glEnable(GL_DEPTH_TEST);
+
+    glEnable(GL_CULL_FACE);
+    // Cull back-facing triangles
+    glCullFace(GL_BACK);
+    // Counter-clockwise is front
+    glFrontFace(GL_CCW);
+}
+
+void Application::setupInputCallbacks()
+{
+    // set camera to the window
+    glfwSetWindowUserPointer(window, inputManager.get());
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    glfwSetFramebufferSizeCallback(window, InputManager::framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, InputManager::mouse_callback);
+    glfwSetScrollCallback(window, InputManager::scroll_callback);
+}
+
+float Application::getDeltaTime()
+{
+    float currentFrame = static_cast<float>(glfwGetTime());
+    float deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
+    return deltaTime;
+}
+
+void Application::processInput(float dt)
+{
+    inputManager->processKeyboard(window, dt);
+}
+
+void Application::updateFPS(const float dt)
+{
+    frameCount++;
+    fpsTimer += dt;
+    if (fpsTimer >= 0.5f) // update every 0.5 seconds
+    {
+        fpsToDisplay = frameCount / fpsTimer;
+        fpsTimer = 0.0f;
+        frameCount = 0;
+    }
+}
+
+void Application::setupImGuiUI()
+{
+    ImGui::Begin("Stats:");
+    ImGui::Text("FPS: %.1f", fpsToDisplay);
+    glm::vec3 camPos = camera->Position;
+    ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
+    ImGui::End();
 }
