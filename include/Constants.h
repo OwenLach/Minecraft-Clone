@@ -13,6 +13,9 @@ namespace Constants
     constexpr float ZOOM_SENSITIVITY = 5.0f;
 
     constexpr int CHUNK_SIZE_X = 16;
-    constexpr int CHUNK_SIZE_Y = 128;
+    constexpr int CHUNK_SIZE_Y = 64;
     constexpr int CHUNK_SIZE_Z = 16;
+
+    // number of chunks
+    constexpr int WORLD_SIZE = 16;
 }

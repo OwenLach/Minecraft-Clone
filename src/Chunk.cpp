@@ -10,8 +10,8 @@
 #include "BlockTypes.h"
 #include <iostream>
 
-Chunk::Chunk(Shader &shader, TextureAtlas *atlas)
-    : shader(shader), textureAtlas(atlas)
+Chunk::Chunk(Shader &shader, TextureAtlas *atlas, glm::vec3 pos)
+    : shader(shader), textureAtlas(atlas), worldPos(pos)
 {
     blocks.reserve(Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z);
     rebuildMesh();
@@ -25,6 +25,7 @@ void Chunk::renderChunk()
 
     // need to set model matrix
     glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, worldPos);
     shader.setMat4("model", model);
 
     // 5 is for the 3 pos floats and 2 texture coord floats
