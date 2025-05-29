@@ -1,24 +1,8 @@
-Core Responsibilities of the World Class
-1. Chunk Management
-
-    Store all loaded chunks.
-
-    Load new chunks as needed.
-
-    Unload distant chunks (optional, for optimization).
-
-2. Coordinate Translation
-
-    Convert world coordinates to chunk-local coordinates and chunk positions.
-
-3. Block Access
-
-    Get/set a block at a global position.
-
-    Rebuild chunk meshes when blocks change.
-
-4. World Generation
-
-    Generate terrain using noise (e.g., Perlin).
-
-    Populate newly created chunks with block data.
+| Task                         | Goal                                           |
+| ---------------------------- | ---------------------------------------------- |
+| World class                  | Manage multiple chunks dynamically             |
+| Chunk loading/unloading      | Load chunks around player, unload distant ones |
+| Coordinate conversion        | Smooth block queries across chunk boundaries   |
+| Seamless mesh generation     | Neighbor-aware mesh to avoid visual gaps       |
+| Procedural multi-chunk world | Expand terrain over multiple chunks            |
+| Optimization                 | Performance-friendly rendering & updates       |
