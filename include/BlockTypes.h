@@ -7,7 +7,8 @@ enum BlockType
     Grass,
     Stone,
     Cobblestone,
-    CryingObsidian
+    CryingObsidian,
+    Dirt
 };
 
 enum class BlockFaces

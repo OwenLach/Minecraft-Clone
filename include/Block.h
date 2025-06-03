@@ -11,10 +11,10 @@ class Block
 {
 public:
     BlockType type;
-    glm::vec3 position;
+    glm::ivec3 position;
 
     Block();
-    Block(BlockType type, glm::vec3 pos);
+    Block(BlockType type, glm::ivec3 pos);
     std::vector<float> generateFacevertices(BlockFaces face, const std::vector<glm::vec2> &faceUVs) const;
 
 private:

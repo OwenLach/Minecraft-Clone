@@ -3,15 +3,14 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Chunk.h"
-#include "VertexArray.h"
-#include "VertexBuffer.h"
-#include "VertexBufferLayout.h"
-#include "BlockTypes.h"
 #include <iostream>
 
-Chunk::Chunk(Shader &shader, TextureAtlas *atlas, glm::vec3 pos)
-    : shader(shader), textureAtlas(atlas), worldPos(pos)
+#include "Chunk.h"
+#include "BlockTypes.h"
+#include "World.h"
+
+Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world)
+    : shader(shader), textureAtlas(atlas), worldPos(pos), world(world)
 {
     blocks.reserve(Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z);
     rebuildMesh();
@@ -25,7 +24,8 @@ void Chunk::renderChunk()
 
     // need to set model matrix
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, worldPos);
+
+    model = glm::translate(model, glm::vec3(worldPos.x * Constants::CHUNK_SIZE_X, 0, worldPos.z * Constants::CHUNK_SIZE_Z));
     shader.setMat4("model", model);
 
     // 5 is for the 3 pos floats and 2 texture coord floats
@@ -39,13 +39,16 @@ bool Chunk::blockInBounds(glm::ivec3 pos) const
 
 const Block &Chunk::getBlockAt(glm::ivec3 pos) const
 {
-    static Block airBlock;
     if (!blockInBounds(pos))
-        // return a default air block if its out of bounds
+    {
+        // Out of bounds — return a static air block
+        static Block airBlock(BlockType::Air, glm::vec3(0));
         return airBlock;
+        std::cout << "BLOCK NOT IN BOUND" << std::endl;
+    }
 
-    // return blocks[pos.x + Constants::CHUNK_SIZE_X * (pos.y + Constants::CHUNK_SIZE_Y * pos.z)];
-    return blocks[pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y)];
+    size_t index = pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y);
+    return blocks[index];
 }
 
 void Chunk::rebuildMesh()
@@ -86,7 +89,7 @@ std::vector<Vertex> Chunk::generateChunkMesh()
             for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
             {
                 BlockType type = (y < Constants::CHUNK_SIZE_Y / 3) ? BlockType::Stone : BlockType::Grass;
-                Block currBlock(type, glm::vec3(x, y, z));
+                Block currBlock(type, glm::ivec3(x, y, z));
                 blocks.push_back(currBlock);
             }
         }
@@ -112,11 +115,26 @@ void Chunk::generateBlockMesh(const Block &block, std::vector<Vertex> &meshVerts
     for (int faceIdx = 0; faceIdx < 6; faceIdx++)
     {
         BlockFaces face = static_cast<BlockFaces>(faceIdx);
-        // check if the neighbor block touching the current face idx is air
-        glm::ivec3 neighborPos = getNeighborPosition(block.position, face);
-        BlockType neighborType = getBlockTypeAt(neighborPos);
+        glm::ivec3 offset = getFaceOffset(face);
+        glm::ivec3 neighborLocalPos = block.position + getFaceOffset(face);
 
-        // if the neighbor type is air, render the current face
+        BlockType neighborType = BlockType::Air; // Assume air by default
+
+        if (neighborLocalPos.x < 0 || neighborLocalPos.x >= Constants::CHUNK_SIZE_X ||
+            neighborLocalPos.y < 0 || neighborLocalPos.y >= Constants::CHUNK_SIZE_Y ||
+            neighborLocalPos.z < 0 || neighborLocalPos.z >= Constants::CHUNK_SIZE_Z)
+        {
+            // Neighbor is in an adjacent chunk
+            glm::ivec3 currBlockWorldCoords = world->chunkToWorldCoords(worldPos, block.position);
+            glm::ivec3 neighborWorldPos = currBlockWorldCoords + offset;
+            neighborType = world->getBlockAt(neighborWorldPos).type;
+        }
+        else
+        {
+            // Neighbor is in the same chunk
+            neighborType = getBlockAt(neighborLocalPos).type;
+        }
+
         if (neighborType == BlockType::Air)
         {
             std::vector<glm::vec2> faceUVs = textureAtlas->getFaceUVs(block.type, face);
@@ -133,28 +151,23 @@ void Chunk::generateBlockMesh(const Block &block, std::vector<Vertex> &meshVerts
     }
 }
 
-BlockType Chunk::getBlockTypeAt(glm::ivec3 pos) const
-{
-    return getBlockAt(pos).type;
-}
-
-glm::ivec3 Chunk::getNeighborPosition(glm::ivec3 pos, BlockFaces face) const
+glm::ivec3 Chunk::getFaceOffset(BlockFaces face) const
 {
     switch (face)
     {
     case BlockFaces::Front:
-        return pos + glm::ivec3(0, 0, 1);
+        return glm::ivec3(0, 0, 1);
     case BlockFaces::Back:
-        return pos + glm::ivec3(0, 0, -1);
+        return glm::ivec3(0, 0, -1);
     case BlockFaces::Left:
-        return pos + glm::ivec3(-1, 0, 0);
+        return glm::ivec3(-1, 0, 0);
     case BlockFaces::Right:
-        return pos + glm::ivec3(1, 0, 0);
+        return glm::ivec3(1, 0, 0);
     case BlockFaces::Top:
-        return pos + glm::ivec3(0, 1, 0);
+        return glm::ivec3(0, 1, 0);
     case BlockFaces::Bottom:
-        return pos + glm::ivec3(0, -1, 0);
+        return glm::ivec3(0, -1, 0);
     default:
-        throw std::runtime_error("Invalid BlockFace passed to getNeighborPosition.");
+        throw std::runtime_error("Invalid BlockFace");
     }
 }

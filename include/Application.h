@@ -4,6 +4,7 @@
 #include "Shader.h"
 #include "Chunk.h"
 #include "ImGuiManager.h"
+#include "World.h"
 
 struct GLFWwindow;
 
@@ -19,8 +20,8 @@ private:
     std::unique_ptr<InputManager> inputManager;
     std::unique_ptr<Shader> shader;
     std::unique_ptr<TextureAtlas> textureAtlas;
-    std::unique_ptr<Chunk> chunk;
     std::unique_ptr<ImGuiManager> imguiManager;
+    std::unique_ptr<World> world;
 
     float lastFrame;
     float fpsTimer;

@@ -44,18 +44,12 @@ bool Application::init()
     camera = std::make_unique<Camera>(glm::vec3(0.0f));
     inputManager = std::make_unique<InputManager>(camera.get());
 
-    // set camera to the window
-    glfwSetWindowUserPointer(window, inputManager.get());
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    glfwSetFramebufferSizeCallback(window, InputManager::framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, InputManager::mouse_callback);
-    glfwSetScrollCallback(window, InputManager::scroll_callback);
+    setupInputCallbacks();
 
     textureAtlas = std::make_unique<TextureAtlas>();
     shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
-    chunk = std::make_unique<Chunk>(*shader, textureAtlas.get(), glm::vec3(0 - Constants::CHUNK_SIZE_X / 2, -Constants::CHUNK_SIZE_Y, 0 - Constants::CHUNK_SIZE_Z / 2));
     imguiManager = std::make_unique<ImGuiManager>(window);
+    world = std::make_unique<World>(*shader, textureAtlas.get());
 
     return true;
 }
@@ -136,7 +130,7 @@ void Application::render()
     glm::mat4 view = camera->GetViewMatrix();
     shader->setMat4("view", view);
 
-    chunk->renderChunk();
+    world->render();
     imguiManager->render();
 }
 

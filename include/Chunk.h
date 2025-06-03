@@ -10,6 +10,9 @@
 #include "VertexArray.h"
 #include "VertexBuffer.h"
 #include "VertexBufferLayout.h"
+#include "ChunkCoord.h"
+
+class World;
 
 struct Vertex
 {
@@ -20,7 +23,7 @@ struct Vertex
 class Chunk
 {
 public:
-    Chunk(Shader &shader, TextureAtlas *atlas, glm::vec3 pos);
+    Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world);
     void renderChunk();
     bool blockInBounds(glm::ivec3 pos) const;
 
@@ -44,11 +47,14 @@ public:
 private:
     VertexArray vao;
     VertexBuffer vbo;
+
     Shader &shader;
     TextureAtlas *textureAtlas;
+    ChunkCoord worldPos;
+    World *world;
+
     std::vector<Vertex> vertices;
     std::vector<Block> blocks;
-    glm::vec3 worldPos;
     /**
      * @brief Sets up the OpenGL vertex array object (VAO) and defines the layout
      * of the vertex data for the chunk. This function is typically called
@@ -77,6 +83,5 @@ private:
      *        will be appended. Each face contributes 6 vertices (2 triangles).
      */
     void generateBlockMesh(const Block &block, std::vector<Vertex> &meshVerts);
-    BlockType getBlockTypeAt(glm::ivec3 pos) const;
-    glm::ivec3 getNeighborPosition(glm::ivec3 pos, BlockFaces face) const;
+    glm::ivec3 getFaceOffset(BlockFaces face) const;
 };

@@ -5,11 +5,11 @@
 #include <unordered_map>
 #include <array>
 
-Block::Block() : type(BlockType::Air), position(glm::vec3(0.0f))
+Block::Block() : type(BlockType::Air), position(glm::ivec3(0.0f))
 {
 }
 
-Block::Block(BlockType type, glm::vec3 pos) : type(type), position(pos)
+Block::Block(BlockType type, glm::ivec3 pos) : type(type), position(pos)
 {
 }
 
@@ -40,7 +40,7 @@ std::vector<float> Block::generateFacevertices(BlockFaces face, const std::vecto
 
     for (size_t i = 0; i < 6; ++i)
     {
-        const Vec3 &pos = corners[quadIndices[i]] + position;
+        const Vec3 &pos = corners[quadIndices[i]] + glm::vec3(position);
         const Vec2 &uv = faceUVs[i];
 
         vertices.insert(vertices.end(), {pos.x, pos.y, pos.z, uv.x, uv.y});
