@@ -72,6 +72,10 @@ void TextureAtlas::initIndicies()
     blockIndicies[BlockType::CryingObsidian] = {glm::ivec2(5, 2),  // top
                                                 glm::ivec2(5, 2),  // side
                                                 glm::ivec2(5, 2)}; // bottom
+
+    blockIndicies[BlockType::Dirt] = {glm::ivec2(2, 0),  // top
+                                      glm::ivec2(2, 0),  // side
+                                      glm::ivec2(2, 0)}; // bottom
 }
 
 std::vector<glm::vec2> TextureAtlas::getTileUVs(int tileX, int tileY)

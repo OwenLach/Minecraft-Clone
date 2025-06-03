@@ -40,6 +40,7 @@ target_include_directories(opengl_test PRIVATE
     libs/glfw/include
     libs/stb
     libs/glm
+    libs/fastnoiselite
 )
 
 # Link libraries
