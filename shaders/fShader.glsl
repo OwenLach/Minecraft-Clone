@@ -8,6 +8,5 @@ uniform sampler2D texture1;
 
 void main()
 {
-	// linearly interpolate between both textures
 	FragColor = texture(texture1, TexCoord);
 }

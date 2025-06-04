@@ -18,7 +18,7 @@ World::World(Shader &shader, TextureAtlas *atlas) : shader(shader), textureAtlas
     {
         for (int z = -renderDistance; z < renderDistance; z++)
         {
-            chunkPositions[ChunkCoord{x, z}]->rebuildMesh();
+            chunkPositions[ChunkCoord{x, z}]->updateMesh();
         }
     }
 }
