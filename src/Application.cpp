@@ -192,9 +192,12 @@ void Application::updateFPS(const float dt)
 
 void Application::setupImGuiUI()
 {
-    ImGui::Begin("Stats:");
+    ImGui::Begin("Stats");
+    ImGui::SetWindowSize(ImVec2(300, 100));
     ImGui::Text("FPS: %.1f", fpsToDisplay);
     glm::vec3 camPos = camera->Position;
     ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
+    float zoom = camera->Zoom;
+    ImGui::Text("FOV: (%.2f)", zoom);
     ImGui::End();
 }

@@ -24,64 +24,42 @@ class Chunk
 {
 public:
     Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world);
+
     void renderChunk();
-    bool blockInBounds(glm::ivec3 pos) const;
+    void updateMesh();
+    void configureVertexAttributes();
+    void setDirty();
 
-    /**
-     * @brief Returns a reference to the block at the given position.
-     *
-     * Returns a default air block if the position is outside the chunk bounds.
-     *
-     * @param pos The block position within the chunk.
-     * @return Block& Reference to the block or a default air block if out of bounds.
-     */
-    const Block &getBlockAt(glm::ivec3 pos) const;
+    const Block &getBlockAt(const glm::ivec3 &pos) const;
+    void setBlockAt(glm::ivec3 pos, Block &block);
 
-    /**
-     * @brief Orchestrates the process of updating the chunk's visual data on the GPU.
-     * It calls generateChunkMesh() to get the latest vertex data and then uploads
-     * it to the vertex buffer object (VBO).
-     */
-    void rebuildMesh();
+    inline bool blockInChunkBounds(const glm::ivec3 &pos) const;
 
 private:
-    VertexArray vao;
-    VertexBuffer vbo;
+    std::vector<Vertex> vertices;
+    std::vector<Block> blocks;
+    size_t vertexCount = 0;
 
     Shader &shader;
     TextureAtlas *textureAtlas;
+    VertexArray vao;
+    VertexBuffer vbo;
+
     ChunkCoord worldPos;
     World *world;
 
-    std::vector<Vertex> vertices;
-    std::vector<Block> blocks;
-    /**
-     * @brief Sets up the OpenGL vertex array object (VAO) and defines the layout
-     * of the vertex data for the chunk. This function is typically called
-     * once during the initialization of the Chunk.
-     */
-    void setupChunkMesh();
+    bool isDirty;
+    bool modelMatrixDirty = true;
 
-    /**
-     * @brief Generates the raw vertex data (positions, texture coordinates, etc.)
-     * that represents the visual geometry of the chunk. This function
-     * iterates through the blocks and creates vertices for the visible faces.
-     * @return std::vector<Vertex> A vector containing the vertex data for the chunk.
-     */
-    std::vector<Vertex> generateChunkMesh();
+    glm::mat4 modelMatrix;
 
-    /**
-     * @brief Generates the visible mesh data for a single block.
-     *
-     * This function checks each face of the given block to determine if it should
-     * be rendered (i.e., the adjacent block is air). If a face is visible, it
-     * generates the corresponding vertex data and appends it to the provided
-     * vertex buffer.
-     *
-     * @param block The block for which mesh data is to be generated.
-     * @param meshVerts A reference to the vector where the generated vertex data
-     *        will be appended. Each face contributes 6 vertices (2 triangles).
-     */
-    void generateBlockMesh(const Block &block, std::vector<Vertex> &meshVerts);
-    glm::ivec3 getFaceOffset(BlockFaces face) const;
+    void generateMesh();
+    void generateTerrain();
+    void generateBlockMesh(const Block &block);
+    void addBlockFace(const Block &block, const BlockType type, const BlockFaces face);
+
+    BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset);
+
+    inline bool isTransparent(BlockType type) const;
+    inline size_t getBlockIndex(const glm::ivec3 &pos) const;
 };
