@@ -135,13 +135,41 @@ void Chunk::generateMesh()
 
 void Chunk::generateTerrain()
 {
+    FastNoiseLite noise;
+    noise.SetFrequency(0.02f);
+    noise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_Perlin);
+
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
     {
-        for (int y = 0; y < Constants::CHUNK_SIZE_Y; y++)
+        for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
         {
-            for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
+            for (int y = 0; y < Constants::CHUNK_SIZE_Y; y++)
             {
-                BlockType type = (y < Constants::CHUNK_SIZE_Y / 3) ? BlockType::Stone : BlockType::Grass;
+
+                float worldX = worldPos.x * Constants::CHUNK_SIZE_X + x;
+                float worldZ = worldPos.z * Constants::CHUNK_SIZE_Z + z;
+
+                float noiseVal = noise.GetNoise(worldX, worldZ);
+                int height = (int)((noiseVal + 1.0f) * 0.5f * Constants::CHUNK_SIZE_Y);
+
+                BlockType type;
+                if (y < height - 5)
+                {
+                    type = BlockType::Stone;
+                }
+                else if (y < height)
+                {
+                    type = BlockType::Dirt;
+                }
+                else if (y == height)
+                {
+                    type = BlockType::Grass;
+                }
+                else
+                {
+                    type = BlockType::Air;
+                }
+
                 glm::ivec3 pos = {x, y, z};
                 const size_t index = getBlockIndex(pos);
                 blocks[index] = Block(type, pos);

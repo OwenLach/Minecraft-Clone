@@ -50,7 +50,7 @@ bool Application::init()
     shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
     imguiManager = std::make_unique<ImGuiManager>(window);
     world = std::make_unique<World>(*shader, textureAtlas.get());
-
+    crosshair = std::make_unique<Crosshair>();
     return true;
 }
 
@@ -123,7 +123,7 @@ void Application::render()
     shader->use();
 
     // pass projection matrix to shader (note as projection matricies rarely change, there's no need to do this per frame)
-    glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 1000.0f);
     shader->setMat4("projection", projection);
 
     // set the view matrix
@@ -131,6 +131,7 @@ void Application::render()
     shader->setMat4("view", view);
 
     world->render();
+    crosshair->render();
     imguiManager->render();
 }
 
@@ -199,5 +200,6 @@ void Application::setupImGuiUI()
     ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
     float zoom = camera->Zoom;
     ImGui::Text("FOV: (%.2f)", zoom);
+    ImGui::Text("Chunks Rendered: %zu", world->ChunksRendered);
     ImGui::End();
 }
