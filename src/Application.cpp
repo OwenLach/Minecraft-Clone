@@ -23,24 +23,88 @@ Application::Application()
 
 void Application::run()
 {
-
-    if (!init())
+    try
     {
-        std::cerr << "Failed to initialize application!" << std::endl;
-        return;
+        init();
+        mainLoop();
     }
-    mainLoop();
+    catch (const std::exception &e)
+    {
+        std::cerr << "Application error: " << e.what() << std::endl;
+    }
+
     shutdown();
 }
 
-bool Application::init()
+// bool Application::init()
+// {
+//     if (!initWindow() || !initOpenGL())
+//     {
+//         std::cerr << "Error initializing GLFW or OpenGl" << std::endl;
+//         return false;
+//     }
+
+//     camera = std::make_unique<Camera>(glm::vec3(0.0f));
+//     inputManager = std::make_unique<InputManager>(camera.get());
+
+//     setupInputCallbacks();
+
+//     textureAtlas = std::make_unique<TextureAtlas>();
+//     shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
+//     imguiManager = std::make_unique<ImGuiManager>(window);
+//     world = std::make_unique<World>(*shader, textureAtlas.get());
+//     crosshair = std::make_unique<Crosshair>();
+//     return true;
+// }
+
+void Application::init()
 {
-    if (!initWindow() || !initOpenGL())
+    initWindow();
+    initOpenGL();
+    initComponents();
+}
+
+void Application::initWindow()
+{
+    // initialize and configure glfw window
+    if (!glfwInit())
     {
-        std::cerr << "Error initializing GLFW or OpenGl" << std::endl;
-        return false;
+        throw std::runtime_error("Failed to initialize GLFW");
     }
 
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    // window creation
+    window = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "LearnOpenGL", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        throw std::runtime_error("Failed to make GLFW window");
+    }
+
+    glfwMakeContextCurrent(window);
+
+    // Enable VSync
+    // glfwSwapInterval(1);
+}
+
+void Application::initOpenGL()
+{
+    // load all OpenGL function pointers
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        throw std::runtime_error("Failed to initialize OpenGL");
+    }
+
+    // Log OpenGL info
+    // std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
+    // std::cout << "GPU: " << glGetString(GL_RENDERER) << std::endl;
+}
+
+void Application::initComponents()
+{
     camera = std::make_unique<Camera>(glm::vec3(0.0f));
     inputManager = std::make_unique<InputManager>(camera.get());
 
@@ -51,39 +115,6 @@ bool Application::init()
     imguiManager = std::make_unique<ImGuiManager>(window);
     world = std::make_unique<World>(*shader, textureAtlas.get());
     crosshair = std::make_unique<Crosshair>();
-    return true;
-}
-
-bool Application::initWindow()
-{
-    // initialize and configure glfw window
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    // window creation
-    window = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "LearnOpenGL", NULL, NULL);
-    if (window == NULL)
-    {
-        glfwTerminate();
-        return false;
-    }
-
-    glfwMakeContextCurrent(window);
-
-    return true;
-}
-
-bool Application::initOpenGL()
-{
-    // load all OpenGL function pointers
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        return false;
-    }
-
-    return true;
 }
 
 void Application::shutdown()
