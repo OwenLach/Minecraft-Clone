@@ -30,9 +30,10 @@ private:
     int frameCount;
     float fpsToDisplay;
 
-    bool init();
-    bool initWindow();
-    bool initOpenGL();
+    void init();
+    void initWindow();
+    void initOpenGL();
+    void initComponents();
 
     void shutdown();
 

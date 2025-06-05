@@ -17,7 +17,7 @@ namespace Constants
     constexpr float ZOOM_SENSITIVITY = 5.0f;
 
     constexpr int CHUNK_SIZE_X = 16;
-    constexpr int CHUNK_SIZE_Y = 16;
+    constexpr int CHUNK_SIZE_Y = 32;
     constexpr int CHUNK_SIZE_Z = 16;
 
     constexpr int RENDER_DISTANCE = 8;
