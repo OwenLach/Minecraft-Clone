@@ -5,6 +5,7 @@
 #include "Chunk.h"
 #include "ImGuiManager.h"
 #include "World.h"
+#include "Crosshair.h"
 
 struct GLFWwindow;
 
@@ -22,6 +23,7 @@ private:
     std::unique_ptr<TextureAtlas> textureAtlas;
     std::unique_ptr<ImGuiManager> imguiManager;
     std::unique_ptr<World> world;
+    std::unique_ptr<Crosshair> crosshair;
 
     float lastFrame;
     float fpsTimer;

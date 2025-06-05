@@ -11,6 +11,7 @@
 class World
 {
 public:
+    size_t ChunksRendered = 0;
     /**
      * @brief Constructs the world and initializes rendering systems.
      *
@@ -54,25 +55,20 @@ public:
      */
     glm::ivec3 worldToChunkCoords(glm::ivec3 worldCoords) const;
 
-    /**
-     * @brief Retrieves a block from a specific chunk using chunk coordinates and local block position.
-     *
-     * @param chunkCoords The chunk grid position (X, Z).
-     * @param blockPos The local position of the block within the chunk (X, Y, Z).
-     * @return The requested Block, or an Air block if the chunk or position is invalid.
-     */
+    // Retrieves a block from a specific chunk using chunk coordinates and local block position.
     Block getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos);
 
-    /**
-     * @brief Retrieves a block from the world using global world coordinates.
-     *
-     * @param worldPos The global world-space position
-     * @return The corresponding Block, or an Air block if the position is outside loaded chunks or invalid.
-     */
+    // Retrieves a block from the world using global world coordinates.
     Block getBlockAt(glm::vec3 worldPos);
 
 private:
     std::unordered_map<ChunkCoord, std::unique_ptr<Chunk>> chunkPositions;
     Shader &shader;
     TextureAtlas *textureAtlas;
+
+    static inline bool isInRenderDistance(int x, int z)
+    {
+        const int renderDistance = Constants::RENDER_DISTANCE;
+        return x * x + z * z <= renderDistance * renderDistance;
+    }
 };

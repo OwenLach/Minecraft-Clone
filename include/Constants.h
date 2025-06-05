@@ -20,6 +20,5 @@ namespace Constants
     constexpr int CHUNK_SIZE_Y = 16;
     constexpr int CHUNK_SIZE_Z = 16;
 
-    // number of chunks
-    constexpr int RENDER_DISTANCE = 1;
+    constexpr int RENDER_DISTANCE = 8;
 }

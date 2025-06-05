@@ -4,13 +4,16 @@
 
 World::World(Shader &shader, TextureAtlas *atlas) : shader(shader), textureAtlas(atlas)
 {
-    int renderDistance = Constants::RENDER_DISTANCE;
+    const int renderDistance = Constants::RENDER_DISTANCE;
 
     for (int x = -renderDistance; x < renderDistance; x++)
     {
         for (int z = -renderDistance; z < renderDistance; z++)
         {
-            chunkPositions.emplace(ChunkCoord{x, z}, std::make_unique<Chunk>(shader, textureAtlas, ChunkCoord{x, z}, this));
+            if (isInRenderDistance(x, z))
+            {
+                chunkPositions.emplace(ChunkCoord{x, z}, std::make_unique<Chunk>(shader, textureAtlas, ChunkCoord{x, z}, this));
+            }
         }
     }
 
@@ -18,7 +21,11 @@ World::World(Shader &shader, TextureAtlas *atlas) : shader(shader), textureAtlas
     {
         for (int z = -renderDistance; z < renderDistance; z++)
         {
-            chunkPositions[ChunkCoord{x, z}]->updateMesh();
+            if (isInRenderDistance(x, z))
+            {
+                chunkPositions[ChunkCoord{x, z}]->updateMesh();
+                ChunksRendered++;
+            }
         }
     }
 }
@@ -30,8 +37,11 @@ void World::render()
     {
         for (int z = -renderDistance; z < renderDistance; z++)
         {
-            chunkPositions.at(ChunkCoord{x, z})->renderChunk();
-        }
+            if (isInRenderDistance(x, z))
+            {
+                chunkPositions.at(ChunkCoord{x, z})->renderChunk();
+            }
+                }
     }
 }
 
