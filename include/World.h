@@ -7,6 +7,7 @@
 #include "TextureAtlas.h"
 #include "ChunkCoord.h"
 #include "Block.h"
+#include "Camera.h"
 
 class World
 {
@@ -18,7 +19,7 @@ public:
      * @param shader Reference to the main shader used for rendering.
      * @param atlas Pointer to the texture atlas used for block textures.
      */
-    World(Shader &shader, TextureAtlas *atlas);
+    World(Shader &shader, TextureAtlas *atlas, Camera &camera);
 
     /**
      * @brief Renders all currently loaded and visible chunks.
@@ -36,7 +37,9 @@ public:
      * - Chunk loading and unloading based on player position
      * - Block and lighting updates
      */
-    void update() const;
+    void update();
+
+    void loadChunk(ChunkCoord coord);
 
     /**
      * @brief Converts local block coordinates within a chunk to world coordinates.
@@ -49,11 +52,8 @@ public:
 
     /**
      * @brief Converts a world-space block coordinate to its corresponding chunk coordinate.
-     *
-     * @param worldCoords The block's world coordinates.
-     * @return A 3D chunk coordinate where the block resides (Y may be used for 3D chunk grids).
      */
-    glm::ivec3 worldToChunkCoords(glm::ivec3 worldCoords) const;
+    ChunkCoord worldToChunkCoords(glm::ivec3 worldCoords) const;
 
     // Retrieves a block from a specific chunk using chunk coordinates and local block position.
     Block getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos);
@@ -62,9 +62,11 @@ public:
     Block getBlockAt(glm::vec3 worldPos);
 
 private:
-    std::unordered_map<ChunkCoord, std::unique_ptr<Chunk>> chunkPositions;
+    std::unordered_map<ChunkCoord, std::unique_ptr<Chunk>> loadedChunks;
+
     Shader &shader;
     TextureAtlas *textureAtlas;
+    Camera &camera;
 
     static inline bool isInRenderDistance(int x, int z)
     {

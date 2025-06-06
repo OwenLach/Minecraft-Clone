@@ -4,6 +4,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
+#include <array>
 
 #include "Chunk.h"
 #include "BlockTypes.h"
@@ -37,7 +38,7 @@ void Chunk::renderChunk()
     {
         glm::mat4 model = glm::mat4(1.0f);
         modelMatrix = glm::translate(model, glm::vec3(worldPos.x * Constants::CHUNK_SIZE_X,
-                                                      -Constants::CHUNK_SIZE_Y - 2,
+                                                      -Constants::CHUNK_SIZE_Y,
                                                       worldPos.z * Constants::CHUNK_SIZE_Z));
         modelMatrixDirty = false;
     }
@@ -136,7 +137,7 @@ void Chunk::generateMesh()
 void Chunk::generateTerrain()
 {
     FastNoiseLite noise;
-    noise.SetFrequency(0.02f);
+    noise.SetFrequency(0.01f);
     noise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_Perlin);
 
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
@@ -150,7 +151,7 @@ void Chunk::generateTerrain()
                 float worldZ = worldPos.z * Constants::CHUNK_SIZE_Z + z;
 
                 float noiseVal = noise.GetNoise(worldX, worldZ);
-                int height = (int)((noiseVal + 1.0f) * 0.5f * Constants::CHUNK_SIZE_Y);
+                int height = Constants::TERRAIN_BASE_HEIGHT + (int)(noiseVal * Constants::TERRAIN_HEIGHT_VARIATION);
 
                 BlockType type;
                 if (y < height - 5)
