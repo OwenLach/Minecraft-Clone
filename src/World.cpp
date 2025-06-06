@@ -2,7 +2,7 @@
 #include "FastNoiseLite.h"
 #include <iostream>
 
-World::World(Shader &shader, TextureAtlas *atlas) : shader(shader), textureAtlas(atlas)
+World::World(Shader &shader, TextureAtlas *atlas, Camera &camera) : shader(shader), textureAtlas(atlas), camera(camera)
 {
     const int renderDistance = Constants::RENDER_DISTANCE;
 
@@ -12,7 +12,7 @@ World::World(Shader &shader, TextureAtlas *atlas) : shader(shader), textureAtlas
         {
             if (isInRenderDistance(x, z))
             {
-                chunkPositions.emplace(ChunkCoord{x, z}, std::make_unique<Chunk>(shader, textureAtlas, ChunkCoord{x, z}, this));
+                loadChunk(ChunkCoord{x, z});
             }
         }
     }
@@ -23,7 +23,7 @@ World::World(Shader &shader, TextureAtlas *atlas) : shader(shader), textureAtlas
         {
             if (isInRenderDistance(x, z))
             {
-                chunkPositions[ChunkCoord{x, z}]->updateMesh();
+                loadedChunks[ChunkCoord{x, z}]->updateMesh();
                 ChunksRendered++;
             }
         }
@@ -32,21 +32,47 @@ World::World(Shader &shader, TextureAtlas *atlas) : shader(shader), textureAtlas
 
 void World::render()
 {
+    // int renderDistance = Constants::RENDER_DISTANCE;
+    // for (int x = -renderDistance; x < renderDistance; x++)
+    // {
+    //     for (int z = -renderDistance; z < renderDistance; z++)
+    //     {
+    //         if (isInRenderDistance(x, z))
+    //         {
+    //             loadedChunks.at(ChunkCoord{x, z})->renderChunk();
+    //         }
+    //     }
+    // }
+
+    for (auto &[pos, chunk] : loadedChunks)
+    {
+        chunk->renderChunk();
+    }
+}
+
+void World::update()
+{
     int renderDistance = Constants::RENDER_DISTANCE;
+    ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera.Position));
+
     for (int x = -renderDistance; x < renderDistance; x++)
     {
         for (int z = -renderDistance; z < renderDistance; z++)
         {
-            if (isInRenderDistance(x, z))
+            ChunkCoord chunkCoord{playerPos.x + x, playerPos.z + z};
+            if (loadedChunks.find(chunkCoord) == loadedChunks.end())
             {
-                chunkPositions.at(ChunkCoord{x, z})->renderChunk();
+                loadChunk(chunkCoord);
             }
-                }
+        }
     }
 }
 
-void World::update() const
+void World::loadChunk(ChunkCoord coord)
 {
+    auto chunk = std::make_unique<Chunk>(shader, textureAtlas, coord, this);
+    chunk->updateMesh();
+    loadedChunks.emplace(coord, std::move(chunk));
 }
 
 glm::ivec3 World::chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const
@@ -58,17 +84,17 @@ glm::ivec3 World::chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos
     return glm::ivec3(x, y, z);
 }
 
-glm::ivec3 World::worldToChunkCoords(glm::ivec3 worldCoords) const
+ChunkCoord World::worldToChunkCoords(glm::ivec3 worldCoords) const
 {
     int chunkX = glm::floor(worldCoords.x / (float)Constants::CHUNK_SIZE_X);
     int chunkZ = glm::floor(worldCoords.z / (float)Constants::CHUNK_SIZE_Z);
-    return glm::ivec3(chunkX, 0, chunkZ);
+    return {chunkX, chunkZ};
 }
 
 Block World::getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos)
 {
-    auto it = chunkPositions.find(chunkCoords);
-    if (it == chunkPositions.end())
+    auto it = loadedChunks.find(chunkCoords);
+    if (it == loadedChunks.end())
     {
         static Block airBlock;
         return airBlock;
@@ -84,8 +110,7 @@ Block World::getBlockAt(glm::vec3 worldPos)
     glm::ivec3 worldCoords = glm::floor(worldPos);
 
     // Convert world coordinates to chunk coordinates
-    glm::ivec3 chunkCoords3D = worldToChunkCoords(worldCoords);
-    ChunkCoord chunkCoord = {chunkCoords3D.x, chunkCoords3D.z}; // only x and z are used for chunk addressing
+    ChunkCoord chunkCoord = worldToChunkCoords(worldCoords);
 
     // Convert world coordinates to local chunk coordinates
     // Modulo math ensures correct wrapping even with negative positions
@@ -96,8 +121,8 @@ Block World::getBlockAt(glm::vec3 worldPos)
     glm::ivec3 localBlockPos = glm::ivec3(localX, localY, localZ);
 
     // Attempt to find the chunk at the given chunk coordinates
-    auto it = chunkPositions.find(chunkCoord);
-    if (it == chunkPositions.end())
+    auto it = loadedChunks.find(chunkCoord);
+    if (it == loadedChunks.end())
     {
         // If the chunk doesn't exist (e.g., out of render distance), return a default air block.
         // This helps avoid errors and lets face culling work properly on chunk edges.

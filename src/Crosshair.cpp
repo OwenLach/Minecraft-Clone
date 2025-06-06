@@ -37,7 +37,7 @@ void Crosshair::configureVertexAttributes()
     const float vertical = crosshairPixels / (Constants::SCREEN_H / 2);
 
     float vertices[] = {
-        // Horizontal line (make it bigger, e.g., 0.1 means 10% of half-screen)
+        // Horizontal line
         -horizontal, 0.0f, // Left
         horizontal, 0.0f,  // Right
         // Vertical line
@@ -46,7 +46,6 @@ void Crosshair::configureVertexAttributes()
     };
 
     vao.bind();
-    vbo.bind();
     vbo.setData(vertices, sizeof(vertices));
 
     VertexBufferLayout layout;

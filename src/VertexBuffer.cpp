@@ -11,7 +11,10 @@ VertexBuffer::VertexBuffer() : dataSet(false)
 
 VertexBuffer::~VertexBuffer()
 {
-    glDeleteBuffers(1, &ID);
+    if (ID != 0)
+    {
+        glDeleteBuffers(1, &ID);
+    }
 }
 
 void VertexBuffer::setData(const float *data, int size)
@@ -24,14 +27,11 @@ void VertexBuffer::setData(const float *data, int size)
 
 void VertexBuffer::bind() const
 {
-    if (dataSet)
+    if (!dataSet)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, ID);
+        throw std::runtime_error("Attempting to bind VertexBuffer with no data");
     }
-    else
-    {
-        std::cerr << "Binding buffer with no data" << std::endl;
-    }
+    glBindBuffer(GL_ARRAY_BUFFER, ID);
 }
 
 void VertexBuffer::unbind() const

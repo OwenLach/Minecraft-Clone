@@ -1,8 +1,10 @@
-| Task                         | Goal                                           |
-| ---------------------------- | ---------------------------------------------- |
-| World class                  | Manage multiple chunks dynamically             |
-| Chunk loading/unloading      | Load chunks around player, unload distant ones |
-| Coordinate conversion        | Smooth block queries across chunk boundaries   |
-| Seamless mesh generation     | Neighbor-aware mesh to avoid visual gaps       |
-| Procedural multi-chunk world | Expand terrain over multiple chunks            |
-| Optimization                 | Performance-friendly rendering & updates       |
+
+Dirty flag logic → Make sure you're not rebuilding meshes unnecessarily.
+
+Frustum culling → Huge gain for minimal effort.
+
+Greedy meshing → Major reduction in vertices.
+
+Multithread terrain/mesh gen → Offload CPU-intensive work.
+
+Later: Dynamic chunk streaming, LOD, or GPU occlusion culling.

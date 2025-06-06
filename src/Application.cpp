@@ -36,27 +36,6 @@ void Application::run()
     shutdown();
 }
 
-// bool Application::init()
-// {
-//     if (!initWindow() || !initOpenGL())
-//     {
-//         std::cerr << "Error initializing GLFW or OpenGl" << std::endl;
-//         return false;
-//     }
-
-//     camera = std::make_unique<Camera>(glm::vec3(0.0f));
-//     inputManager = std::make_unique<InputManager>(camera.get());
-
-//     setupInputCallbacks();
-
-//     textureAtlas = std::make_unique<TextureAtlas>();
-//     shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
-//     imguiManager = std::make_unique<ImGuiManager>(window);
-//     world = std::make_unique<World>(*shader, textureAtlas.get());
-//     crosshair = std::make_unique<Crosshair>();
-//     return true;
-// }
-
 void Application::init()
 {
     initWindow();
@@ -113,7 +92,7 @@ void Application::initComponents()
     textureAtlas = std::make_unique<TextureAtlas>();
     shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
     imguiManager = std::make_unique<ImGuiManager>(window);
-    world = std::make_unique<World>(*shader, textureAtlas.get());
+    world = std::make_unique<World>(*shader, textureAtlas.get(), *camera);
     crosshair = std::make_unique<Crosshair>();
 }
 
@@ -169,6 +148,7 @@ void Application::render()
 void Application::update(const float dt)
 {
     updateFPS(dt);
+    world->update();
     imguiManager->update();
     setupImGuiUI();
 }
