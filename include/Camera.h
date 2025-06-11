@@ -6,7 +6,7 @@
 
 #include "Constants.h"
 
-enum Camera_Movement
+enum CameraMovement
 {
     FORWARD,
     BACKWARD,
@@ -35,13 +35,16 @@ public:
     float ZoomSensitivity;
 
     // constructor with vectors
-    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = Constants::YAW, float pitch = Constants::PITCH);
+    Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
+           glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
+           float yaw = Constants::YAW,
+           float pitch = Constants::PITCH);
 
     // returns the view matrix calculated using Euler Angles and the LookAt Matrix
     glm::mat4 GetViewMatrix();
 
     // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
-    void ProcessKeyboard(Camera_Movement direction, float deltaTime);
+    void ProcessKeyboard(CameraMovement direction, float deltaTime);
 
     // processes input received from a mouse input system. Expects the offset value in both the x and y direction.
     void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);

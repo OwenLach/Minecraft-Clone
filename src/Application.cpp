@@ -56,7 +56,7 @@ void Application::initWindow()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // window creation
-    window = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "LearnOpenGL", NULL, NULL);
+    window = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "MineCraft Clone", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -84,11 +84,9 @@ void Application::initOpenGL()
 
 void Application::initComponents()
 {
-    camera = std::make_unique<Camera>(glm::vec3(0.0f));
+    camera = std::make_unique<Camera>(glm::vec3(0.0f, -100.0f, 0.0f));
     inputManager = std::make_unique<InputManager>(camera.get());
-
     setupInputCallbacks();
-
     textureAtlas = std::make_unique<TextureAtlas>();
     shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
     imguiManager = std::make_unique<ImGuiManager>(window);
@@ -112,7 +110,6 @@ void Application::mainLoop()
         processInput(dt);
         update(dt);
         render();
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -133,7 +130,7 @@ void Application::render()
     shader->use();
 
     // pass projection matrix to shader (note as projection matricies rarely change, there's no need to do this per frame)
-    glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 1000.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 10000.0f);
     shader->setMat4("projection", projection);
 
     // set the view matrix
