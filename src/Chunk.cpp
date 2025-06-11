@@ -24,47 +24,45 @@ Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world)
     : shader(shader), textureAtlas(atlas), worldPos(pos), world(world)
 {
     // reserve for worse case
-    vertices.reserve(Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z * 36);
+    meshDataBuffer.reserve(Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z * 36);
     blocks.resize(Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z);
-    generateTerrain();
 }
 
 void Chunk::renderChunk()
 {
+    // make sure chunk is loaded
+    if (state != ChunkState::LOADED)
+    {
+        return;
+    }
+
     shader.use();
     vao.bind();
 
-    if (modelMatrixDirty)
-    {
-        glm::mat4 model = glm::mat4(1.0f);
-        modelMatrix = glm::translate(model, glm::vec3(worldPos.x * Constants::CHUNK_SIZE_X,
-                                                      -Constants::CHUNK_SIZE_Y,
-                                                      worldPos.z * Constants::CHUNK_SIZE_Z));
-        modelMatrixDirty = false;
-    }
+    glm::mat4 model = glm::mat4(1.0f);
+    modelMatrix = glm::translate(model, glm::vec3(worldPos.x * Constants::CHUNK_SIZE_X,
+                                                  -Constants::CHUNK_SIZE_Y,
+                                                  worldPos.z * Constants::CHUNK_SIZE_Z));
 
     shader.setMat4("model", modelMatrix);
     glDrawArrays(GL_TRIANGLES, 0, vertexCount);
 }
 
-void Chunk::updateMesh()
+void Chunk::uploadMeshToGPU()
 {
-    vertices.clear();
-    std::vector<float> vertexData;
-    vertexData.reserve(vertices.capacity() * 5); // 5 floats per vertex
-
-    generateMesh();
-
-    // convert member var std::vector<Vertex> verticies to flat array
-    for (const auto &vertex : vertices)
+    if (meshDataBuffer.empty())
     {
-        vertexData.insert(vertexData.end(), {vertex.pos.x, vertex.pos.y, vertex.pos.z,
-                                             vertex.uvs.x, vertex.uvs.y});
+        vertexCount = 0;
+        isDirty = false;
+        return;
     }
-    vbo.setData(vertexData.data(), vertexData.size() * sizeof(float));
-    vertexCount = vertexData.size();
+
+    vbo.setData(meshDataBuffer.data(), meshDataBuffer.size() * sizeof(float));
+    vertexCount = meshDataBuffer.size() / 5; // five float per vertex
 
     configureVertexAttributes();
+    meshDataBuffer.clear();
+    isDirty = false;
 }
 
 void Chunk::configureVertexAttributes()
@@ -79,45 +77,14 @@ void Chunk::configureVertexAttributes()
 void Chunk::setDirty()
 {
     isDirty = true;
-    modelMatrixDirty = true;
-}
-
-void Chunk::setBlockAt(glm::ivec3 pos, Block &block)
-{
-}
-
-inline bool Chunk::blockInChunkBounds(const glm::ivec3 &pos) const
-{
-    return pos.x >= 0 && pos.x < Constants::CHUNK_SIZE_X &&
-           pos.y >= 0 && pos.y < Constants::CHUNK_SIZE_Y &&
-           pos.z >= 0 && pos.z < Constants::CHUNK_SIZE_Z;
-}
-
-const Block &Chunk::getBlockAt(const glm::ivec3 &pos) const
-{
-    if (!blockInChunkBounds(pos))
-    {
-        // Out of bounds — return a static air block
-        static Block airBlock(BlockType::Air, glm::vec3(0));
-        return airBlock;
-    }
-
-    const size_t index = getBlockIndex(pos);
-    return blocks[index];
-}
-
-inline bool Chunk::isTransparent(BlockType type) const
-{
-    return type == BlockType::Air;
-}
-
-inline size_t Chunk::getBlockIndex(const glm::ivec3 &pos) const
-{
-    return pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y);
+    // modelMatrixDirty = true;
 }
 
 void Chunk::generateMesh()
 {
+    // clear previous mesh
+    meshDataBuffer.clear();
+
     // loop through chunk and generate each blocks mesh
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
     {
@@ -205,16 +172,17 @@ void Chunk::addBlockFace(const Block &block, const BlockType type, const BlockFa
     const std::vector<glm::vec2> faceUVs = textureAtlas->getFaceUVs(type, face);
     const std::vector<float> rawVertices = block.generateFacevertices(face, faceUVs);
 
-    // Reserve space to avoid reallocation
-    vertices.reserve(vertices.size() + rawVertices.size() / 5);
+    meshDataBuffer.insert(meshDataBuffer.end(), rawVertices.begin(), rawVertices.end());
+    // // Reserve space to avoid reallocation
+    // meshDataBuffer.reserve(meshDataBuffer.size() + rawVertices.size() / 5);
 
-    for (size_t i = 0; i < rawVertices.size(); i += 5)
-    {
-        vertices.push_back({
-            {rawVertices[i], rawVertices[i + 1], rawVertices[i + 2]}, // pos
-            {rawVertices[i + 3], rawVertices[i + 4]}                  // uvs
-        });
-    }
+    // for (size_t i = 0; i < rawVertices.size(); i += 5)
+    // {
+    //     meshDataBuffer.push_back({
+    //         {rawVertices[i], rawVertices[i + 1], rawVertices[i + 2]}, // pos
+    //         {rawVertices[i + 3], rawVertices[i + 4]}                  // uvs
+    //     });
+    // }
 }
 
 BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset)
@@ -236,4 +204,34 @@ BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec
         // get type of neighbor
         return world->getBlockAt(neighborWorldPos).type;
     }
+}
+
+const Block &Chunk::getBlockAt(const glm::ivec3 &pos) const
+{
+    if (!blockInChunkBounds(pos))
+    {
+        // Out of bounds — return a static air block
+        static Block airBlock(BlockType::Air, glm::vec3(0));
+        return airBlock;
+    }
+
+    const size_t index = getBlockIndex(pos);
+    return blocks[index];
+}
+
+inline bool Chunk::isTransparent(BlockType type) const
+{
+    return type == BlockType::Air;
+}
+
+inline size_t Chunk::getBlockIndex(const glm::ivec3 &pos) const
+{
+    return pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y);
+}
+
+inline bool Chunk::blockInChunkBounds(const glm::ivec3 &pos) const
+{
+    return pos.x >= 0 && pos.x < Constants::CHUNK_SIZE_X &&
+           pos.y >= 0 && pos.y < Constants::CHUNK_SIZE_Y &&
+           pos.z >= 0 && pos.z < Constants::CHUNK_SIZE_Z;
 }

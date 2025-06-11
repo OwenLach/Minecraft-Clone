@@ -1,13 +1,18 @@
 #pragma once
 
 #include <unordered_map>
+#include <queue>
+#include <mutex>
+
 #include <glm/glm.hpp>
+
 #include "Chunk.h"
 #include "Shader.h"
 #include "TextureAtlas.h"
 #include "ChunkCoord.h"
 #include "Block.h"
 #include "Camera.h"
+#include "ThreadPool.h"
 
 class World
 {
@@ -40,6 +45,7 @@ public:
     void update();
 
     void loadChunk(ChunkCoord coord);
+    void unloadChunk(ChunkCoord coord);
 
     /**
      * @brief Converts local block coordinates within a chunk to world coordinates.
@@ -62,15 +68,27 @@ public:
     Block getBlockAt(glm::vec3 worldPos);
 
 private:
-    std::unordered_map<ChunkCoord, std::unique_ptr<Chunk>> loadedChunks;
-
     Shader &shader;
     TextureAtlas *textureAtlas;
     Camera &camera;
 
-    static inline bool isInRenderDistance(int x, int z)
+    // storage for loaded chunks, chunks might be in one of several states
+    std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks;
+
+    ThreadPool chunkThreadPool;
+
+    std::queue<std::shared_ptr<Chunk>> meshGenQueue;
+    std::queue<std::shared_ptr<Chunk>> uploadQueue;
+
+    std::mutex meshGenMutex;
+    std::mutex uploadMutex;
+
+    static inline bool
+    isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
     {
         const int renderDistance = Constants::RENDER_DISTANCE;
-        return x * x + z * z <= renderDistance * renderDistance;
+        const int dx = chunkX - playerX;
+        const int dz = chunkZ - playerZ;
+        return dx * dx + dz * dz <= renderDistance * renderDistance;
     }
 };

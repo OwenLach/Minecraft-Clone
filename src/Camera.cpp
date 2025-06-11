@@ -4,14 +4,19 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(Constants::PLAYER_SPEED),
-      MouseSensitivity(Constants::MOUSE_SENSITIVITY), Zoom(Constants::ZOOM), ZoomSensitivity(Constants::ZOOM_SENSITIVITY)
+Camera::Camera(const glm::vec3 position, const glm::vec3 up, float yaw, float pitch)
+    : Position(position),
+      Front(0.0f, 0.0f, -1.0f),
+      Up(0.0f),
+      Right(0.0f),
+      WorldUp(up),
+      Yaw(yaw),
+      Pitch(pitch),
+      MovementSpeed(Constants::PLAYER_SPEED),
+      MouseSensitivity(Constants::MOUSE_SENSITIVITY),
+      Zoom(Constants::ZOOM),
+      ZoomSensitivity(Constants::ZOOM_SENSITIVITY)
 {
-    Position = position;
-    WorldUp = up;
-    Yaw = yaw;
-    Pitch = pitch;
     updateCameraVectors();
 }
 
@@ -20,21 +25,30 @@ glm::mat4 Camera::GetViewMatrix()
     return glm::lookAt(Position, Position + Front, Up);
 }
 
-void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
+void Camera::ProcessKeyboard(CameraMovement direction, float deltaTime)
 {
     float velocity = MovementSpeed * deltaTime;
-    if (direction == FORWARD)
+    switch (direction)
+    {
+    case CameraMovement::FORWARD:
         Position += Front * velocity;
-    if (direction == BACKWARD)
+        break;
+    case CameraMovement::BACKWARD:
         Position -= Front * velocity;
-    if (direction == LEFT)
+        break;
+    case CameraMovement::LEFT:
         Position -= Right * velocity;
-    if (direction == RIGHT)
+        break;
+    case CameraMovement::RIGHT:
         Position += Right * velocity;
-    if (direction == UP)
+        break;
+    case CameraMovement::UP:
         Position += Up * velocity;
-    if (direction == DOWN)
+        break;
+    case CameraMovement::DOWN:
         Position -= Up * velocity;
+        break;
+    }
 }
 
 void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch)
