@@ -67,6 +67,7 @@ private:
     glm::mat4 modelMatrix;
 
     void generateBlockMesh(const Block &block);
+    std::vector<float> generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs) const;
     void addBlockFace(const Block &block, const BlockType type, const BlockFaces face);
 
     BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset);
