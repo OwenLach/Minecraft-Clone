@@ -1,12 +1,16 @@
 #version 330 core
-out vec4 FragColor;
 
 in vec2 TexCoord;
+in float AO;
+
+out vec4 FragColor;
 
 // texture samplers
 uniform sampler2D texture1;
 
 void main()
-{
-	FragColor = texture(texture1, TexCoord);
+{	
+	vec4 textureColor = texture(texture1, TexCoord);
+	textureColor.rgb *= AO;  
+	FragColor = textureColor;
 }

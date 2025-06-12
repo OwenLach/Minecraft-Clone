@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <array>
+#include <vector>
 
 #include "Chunk.h"
 #include "BlockTypes.h"
@@ -71,6 +72,7 @@ void Chunk::configureVertexAttributes()
     VertexBufferLayout layout;
     layout.push<float>(3); // position
     layout.push<float>(2); // texture coords
+    layout.push<float>(1); // AO
     vao.addBuffer(vbo, layout);
 }
 
@@ -171,6 +173,8 @@ std::vector<float> Chunk::generateFacevertices(const Block &block, BlockFaces fa
 {
     using Vec3 = glm::vec3;
     using Vec2 = glm::vec2;
+    using IVec3 = glm::ivec3;
+    using AOTriplet = std::array<IVec3, 3>;
 
     static const std::unordered_map<BlockFaces, std::array<Vec3, 4>> faceCorners = {
         {BlockFaces::Front, {Vec3(-0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f)}},
@@ -181,23 +185,136 @@ std::vector<float> Chunk::generateFacevertices(const Block &block, BlockFaces fa
         {BlockFaces::Bottom, {Vec3(-0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(-0.5f, -0.5f, 0.5f)}},
     };
 
+    static const std::unordered_map<BlockFaces, std::array<AOTriplet, 4>> aoOffsets = {
+        {BlockFaces::Front, {
+                                // Bottom-left vertex
+                                AOTriplet{IVec3(-1, 0, 1), IVec3(0, -1, 1), IVec3(-1, -1, 1)},
+                                // Bottom-right vertex
+                                AOTriplet{IVec3(1, 0, 1), IVec3(0, -1, 1), IVec3(1, -1, 1)},
+                                // Top-right vertex
+                                AOTriplet{IVec3(1, 0, 1), IVec3(0, 1, 1), IVec3(1, 1, 1)},
+                                // Top-left vertex
+                                AOTriplet{IVec3(-1, 0, 1), IVec3(0, 1, 1), IVec3(-1, 1, 1)},
+                            }},
+        {BlockFaces::Back, {
+                               // Bottom-left vertex (from back face perspective)
+                               AOTriplet{IVec3(1, 0, -1), IVec3(0, -1, -1), IVec3(1, -1, -1)},
+                               // Bottom-right vertex
+                               AOTriplet{IVec3(-1, 0, -1), IVec3(0, -1, -1), IVec3(-1, -1, -1)},
+                               // Top-right vertex
+                               AOTriplet{IVec3(-1, 0, -1), IVec3(0, 1, -1), IVec3(-1, 1, -1)},
+                               // Top-left vertex
+                               AOTriplet{IVec3(1, 0, -1), IVec3(0, 1, -1), IVec3(1, 1, -1)},
+                           }},
+        {BlockFaces::Left, {
+                               // Bottom-left vertex
+                               AOTriplet{IVec3(-1, 0, -1), IVec3(-1, -1, 0), IVec3(-1, -1, -1)},
+                               // Bottom-right vertex
+                               AOTriplet{IVec3(-1, 0, 1), IVec3(-1, -1, 0), IVec3(-1, -1, 1)},
+                               // Top-right vertex
+                               AOTriplet{IVec3(-1, 0, 1), IVec3(-1, 1, 0), IVec3(-1, 1, 1)},
+                               // Top-left vertex
+                               AOTriplet{IVec3(-1, 0, -1), IVec3(-1, 1, 0), IVec3(-1, 1, -1)},
+                           }},
+        {BlockFaces::Right, {
+                                // Bottom-left vertex
+                                AOTriplet{IVec3(1, 0, 1), IVec3(1, -1, 0), IVec3(1, -1, 1)},
+                                // Bottom-right vertex
+                                AOTriplet{IVec3(1, 0, -1), IVec3(1, -1, 0), IVec3(1, -1, -1)},
+                                // Top-right vertex
+                                AOTriplet{IVec3(1, 0, -1), IVec3(1, 1, 0), IVec3(1, 1, -1)},
+                                // Top-left vertex
+                                AOTriplet{IVec3(1, 0, 1), IVec3(1, 1, 0), IVec3(1, 1, 1)},
+                            }},
+        {BlockFaces::Top, {
+                              // Bottom-left vertex (front-left from top view)
+                              AOTriplet{IVec3(-1, 1, 0), IVec3(0, 1, 1), IVec3(-1, 1, 1)},
+                              // Bottom-right vertex (front-right from top view)
+                              AOTriplet{IVec3(1, 1, 0), IVec3(0, 1, 1), IVec3(1, 1, 1)},
+                              // Top-right vertex (back-right from top view)
+                              AOTriplet{IVec3(1, 1, 0), IVec3(0, 1, -1), IVec3(1, 1, -1)},
+                              // Top-left vertex (back-left from top view)
+                              AOTriplet{IVec3(-1, 1, 0), IVec3(0, 1, -1), IVec3(-1, 1, -1)},
+                          }},
+        {BlockFaces::Bottom, {
+                                 // Bottom-left vertex (back-left from bottom view)
+                                 AOTriplet{IVec3(-1, -1, 0), IVec3(0, -1, -1), IVec3(-1, -1, -1)},
+                                 // Bottom-right vertex (back-right from bottom view)
+                                 AOTriplet{IVec3(1, -1, 0), IVec3(0, -1, -1), IVec3(1, -1, -1)},
+                                 // Top-right vertex (front-right from bottom view)
+                                 AOTriplet{IVec3(1, -1, 0), IVec3(0, -1, 1), IVec3(1, -1, 1)},
+                                 // Top-left vertex (front-left from bottom view)
+                                 AOTriplet{IVec3(-1, -1, 0), IVec3(0, -1, 1), IVec3(-1, -1, 1)},
+                             }},
+    };
+
     static const std::array<unsigned int, 6> quadIndices = {0, 1, 2, 2, 3, 0};
 
     // Error if invalid UV count
     if (faceUVs.size() != 6)
         throw std::runtime_error("faceUVs must contain exactly 6 elements (6 vertices)");
 
+    // get corners and ao offsets for the face
     const auto &corners = faceCorners.at(face);
+    const auto &aoData = aoOffsets.at(face);
+
+    // ao helper function
+    auto computeAO = [](bool side1, bool side2, bool corner)
+    {
+        if (side1 && side2)
+        {
+            return 0;
+        }
+        return 3 - (side1 + side2 + corner);
+    };
 
     std::vector<float> vertices;
-    vertices.reserve(6 * (3 + 2)); // 6 vertices, each with 3 position + 2 UV
+    vertices.reserve(6 * (3 + 2 + 1)); // 6 vertices, each with 3 position + 2 UV + AO
 
+    // loop through quad indicies
     for (size_t i = 0; i < 6; ++i)
     {
-        const Vec3 &pos = corners[quadIndices[i]] + glm::vec3(block.position);
+        const int cornerIdx = quadIndices[i];
+
+        // example corners for FRONT face: { Vec3(-0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f) }
+        //               current corner vector + block position
+        const Vec3 &pos = corners[cornerIdx] + glm::vec3(block.position);
         const Vec2 &uv = faceUVs[i];
 
-        vertices.insert(vertices.end(), {pos.x, pos.y, pos.z, uv.x, uv.y});
+        // get the offsets for the corner
+        const AOTriplet &offsets = aoData[cornerIdx];
+
+        // get the ao using curr block position + ao offsets
+        // 0 = darkest, 3 = brightest
+        glm::ivec3 blockWorldCoords = world->chunkToWorldCoords(worldPos, block.position);
+
+        bool side1 = world->isBlockSolid(blockWorldCoords + offsets[0]);
+        bool side2 = world->isBlockSolid(blockWorldCoords + offsets[1]);
+        bool corner = world->isBlockSolid(blockWorldCoords + offsets[2]);
+        int aoValue = computeAO(side1, side2, corner);
+
+        // get aoValue in range[0 - 1]
+        float ao;
+        switch (aoValue)
+        {
+        case 0:
+            ao = 0.3f;
+            break; // Darkest - both sides blocked
+        case 1:
+            ao = 0.5f;
+            break; // Dark - two neighbors blocked
+        case 2:
+            ao = 0.7f;
+            break; // Medium - one neighbor blocked
+        case 3:
+            ao = 1.0f;
+            break; // Bright - no neighbors blocked
+        default:
+            ao = 1.0f;
+            break;
+        }
+
+        vertices.insert(vertices.end(), {pos.x, pos.y, pos.z, uv.x, uv.y, ao});
     }
 
     return vertices;

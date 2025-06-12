@@ -111,7 +111,7 @@ Block World::getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos)
     return chunk->getBlockAt(blockPos);
 }
 
-Block World::getBlockAt(glm::vec3 worldPos)
+Block World::getBlockAt(glm::vec3 worldPos) const
 {
     // Round the world position down to the nearest integers to get block-aligned coordinates
     glm::ivec3 worldCoords = glm::floor(worldPos);
@@ -150,6 +150,12 @@ Block World::getBlockAt(glm::vec3 worldPos)
         // If something went wrong (e.g., Y is out of bounds), return air to avoid a crash
         return Block(BlockType::Air, glm::ivec3(0));
     }
+}
+
+bool World::isBlockSolid(glm::ivec3 blockWorldPos) const
+{
+    Block block = getBlockAt(glm::vec3(blockWorldPos));
+    return block.type != BlockType::Air;
 }
 
 void World::loadInitialChunks()

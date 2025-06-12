@@ -65,7 +65,9 @@ public:
     Block getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos);
 
     // Retrieves a block from the world using global world coordinates.
-    Block getBlockAt(glm::vec3 worldPos);
+    Block getBlockAt(glm::vec3 worldPos) const;
+
+    bool isBlockSolid(glm::ivec3 blockWorldPos) const;
 
 private:
     Shader &shader;
