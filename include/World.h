@@ -83,6 +83,14 @@ private:
     std::mutex meshGenMutex;
     std::mutex uploadMutex;
 
+    void loadInitialChunks();
+    void loadVisibleChunks(const ChunkCoord &playerPos, const int renderDistance);
+    void processTerrainToMesh();
+    void processMeshToGPU();
+    void unloadDistantChunks(const ChunkCoord &playerPos);
+
+    int getChunkDistanceSquaredFromPlayer(const ChunkCoord &chunk, const ChunkCoord &playerPos) const;
+
     static inline bool
     isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
     {
