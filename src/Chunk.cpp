@@ -22,11 +22,17 @@ static constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
 }};
 
 Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world)
-    : shader(shader), textureAtlas(atlas), worldPos(pos), world(world)
+    : shader(shader), textureAtlas(atlas), chunkCoord(pos), world(world)
 {
+    const int chunkSize_X = Constants::CHUNK_SIZE_X;
+    const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
+    const int chunkSize_Z = Constants::CHUNK_SIZE_Z;
     // reserve for worse case
-    meshDataBuffer.reserve(Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z * 36);
-    blocks.resize(Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z);
+    meshDataBuffer.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 36);
+    blocks.resize(chunkSize_X * chunkSize_Y * chunkSize_Z);
+
+    boundingBox.min = glm::vec3(chunkCoord.x * chunkSize_X, -chunkSize_Y, chunkCoord.z * chunkSize_Z);
+    boundingBox.max = glm::vec3(chunkCoord.x * chunkSize_X + chunkSize_X, 0, chunkCoord.z * chunkSize_Z + chunkSize_Z);
 }
 
 void Chunk::renderChunk()
@@ -41,9 +47,9 @@ void Chunk::renderChunk()
     vao.bind();
 
     glm::mat4 model = glm::mat4(1.0f);
-    modelMatrix = glm::translate(model, glm::vec3(worldPos.x * Constants::CHUNK_SIZE_X,
+    modelMatrix = glm::translate(model, glm::vec3(chunkCoord.x * Constants::CHUNK_SIZE_X,
                                                   -Constants::CHUNK_SIZE_Y,
-                                                  worldPos.z * Constants::CHUNK_SIZE_Z));
+                                                  chunkCoord.z * Constants::CHUNK_SIZE_Z));
 
     shader.setMat4("model", modelMatrix);
     glDrawArrays(GL_TRIANGLES, 0, vertexCount);
@@ -116,8 +122,8 @@ void Chunk::generateTerrain()
             for (int y = 0; y < Constants::CHUNK_SIZE_Y; y++)
             {
 
-                float worldX = worldPos.x * Constants::CHUNK_SIZE_X + x;
-                float worldZ = worldPos.z * Constants::CHUNK_SIZE_Z + z;
+                float worldX = chunkCoord.x * Constants::CHUNK_SIZE_X + x;
+                float worldZ = chunkCoord.z * Constants::CHUNK_SIZE_Z + z;
 
                 float noiseVal = noise.GetNoise(worldX, worldZ);
                 int height = Constants::TERRAIN_BASE_HEIGHT + (int)(noiseVal * Constants::TERRAIN_HEIGHT_VARIATION);
@@ -286,7 +292,7 @@ std::vector<float> Chunk::generateFacevertices(const Block &block, BlockFaces fa
 
         // get the ao using curr block position + ao offsets
         // 0 = darkest, 3 = brightest
-        glm::ivec3 blockWorldCoords = world->chunkToWorldCoords(worldPos, block.position);
+        glm::ivec3 blockWorldCoords = world->chunkToWorldCoords(chunkCoord, block.position);
 
         bool side1 = world->isBlockSolid(blockWorldCoords + offsets[0]);
         bool side2 = world->isBlockSolid(blockWorldCoords + offsets[1]);
@@ -341,7 +347,7 @@ BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec
     else
     {
         // get blocks world positoins
-        glm::ivec3 blockWorldPos = world->chunkToWorldCoords(worldPos, blockPos);
+        glm::ivec3 blockWorldPos = world->chunkToWorldCoords(chunkCoord, blockPos);
         // get neighbors world pos using blocks position
         glm::ivec3 neighborWorldPos = blockWorldPos + offset;
         // get type of neighbor

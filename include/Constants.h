@@ -3,8 +3,8 @@
 namespace Constants
 {
     // screen settings
-    constexpr unsigned int SCREEN_W = 1600;
-    constexpr unsigned int SCREEN_H = 900;
+    constexpr unsigned int SCREEN_W = 900;
+    constexpr unsigned int SCREEN_H = 600;
 
     // camera setttings
     constexpr float YAW = -90.0f;

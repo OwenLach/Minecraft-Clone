@@ -4,7 +4,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <array>
+#include <memory>
+
 #include "Constants.h"
+#include "Chunk.h"
+#include "Shader.h"
 
 enum CameraMovement
 {
@@ -14,6 +19,11 @@ enum CameraMovement
     RIGHT,
     UP,
     DOWN
+};
+
+struct Frustum
+{
+    std::array<glm::vec4, 6> planes;
 };
 
 class Camera
@@ -34,6 +44,8 @@ public:
     float Zoom;
     float ZoomSensitivity;
 
+    Frustum frustum;
+
     // constructor with vectors
     Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
            glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
@@ -41,18 +53,17 @@ public:
            float pitch = Constants::PITCH);
 
     // returns the view matrix calculated using Euler Angles and the LookAt Matrix
-    glm::mat4 GetViewMatrix();
+    glm::mat4 getViewMatrix();
+    glm::mat4 getProjectionMatrix();
 
-    // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
     void ProcessKeyboard(CameraMovement direction, float deltaTime);
-
-    // processes input received from a mouse input system. Expects the offset value in both the x and y direction.
     void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);
-
-    // processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
     void ProcessMouseScroll(float yoffset);
+
+    bool isAABBInFrustum(BoundingBox &boundingBox) const;
 
 private:
     // calculates the front vector from the Camera's (updated) Euler Angles
     void updateCameraVectors();
+    void updateFrustum();
 };

@@ -101,15 +101,14 @@ void Application::shutdown()
 
 void Application::mainLoop()
 {
-
     while (!glfwWindowShouldClose(window))
     {
-
         float dt = getDeltaTime();
 
         processInput(dt);
         update(dt);
         render();
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -128,14 +127,10 @@ void Application::render()
 
     // activate shader
     shader->use();
-
-    // pass projection matrix to shader (note as projection matricies rarely change, there's no need to do this per frame)
-    glm::mat4 projection = glm::perspective(glm::radians(camera->Zoom), (float)Constants::SCREEN_W / (float)Constants::SCREEN_H, 0.1f, 10000.0f);
-    shader->setMat4("projection", projection);
-
+    // pass projection matrix to shader
+    shader->setMat4("projection", camera->getProjectionMatrix());
     // set the view matrix
-    glm::mat4 view = camera->GetViewMatrix();
-    shader->setMat4("view", view);
+    shader->setMat4("view", camera->getViewMatrix());
 
     world->render();
     crosshair->render();
@@ -152,9 +147,9 @@ void Application::update(const float dt)
 
 void Application::setGLRenderState()
 {
-    // enable depth testing and cull facing
+    // Enable depth testing and cull facing
     glEnable(GL_DEPTH_TEST);
-
+    // Enable face culling
     glEnable(GL_CULL_FACE);
     // Cull back-facing triangles
     glCullFace(GL_BACK);
@@ -202,12 +197,11 @@ void Application::updateFPS(const float dt)
 void Application::setupImGuiUI()
 {
     ImGui::Begin("Stats");
-    ImGui::SetWindowSize(ImVec2(300, 100));
+    ImGui::SetWindowSize(ImVec2(300, 90));
     ImGui::Text("FPS: %.1f", fpsToDisplay);
     glm::vec3 camPos = camera->Position;
     ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
     float zoom = camera->Zoom;
     ImGui::Text("FOV: (%.2f)", zoom);
-    ImGui::Text("Chunks Rendered: %zu", world->ChunksRendered);
     ImGui::End();
 }
