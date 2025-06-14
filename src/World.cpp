@@ -18,36 +18,50 @@ World::World(Shader &shader, TextureAtlas *atlas, Camera &camera)
 
 void World::render()
 {
-    ChunksRendered = 0;
+    int totalChunks = 0;
+    int chunksRendered = 0;
+    int chunksInFrustum = 0;
+    int chunksOutOfFrustum = 0;
+
     for (auto &[pos, chunk] : loadedChunks)
     {
+        totalChunks++;
         if (chunk->state == ChunkState::LOADED)
         {
-            chunk->renderChunk();
-            ChunksRendered++;
+            if (camera.isAABBInFrustum(chunk->boundingBox))
+            {
+                chunk->renderChunk();
+                chunksRendered++;
+                chunksInFrustum++;
+            }
+            else
+            {
+                chunksOutOfFrustum++;
+            }
         }
     }
+
+    // Print every few frames to avoid spam
+    // static int frameCount = 0;
+    // if (frameCount++ % 60 == 0)
+    // {
+    //     printf("Total: %d, Loaded: %d, In Frustum: %d, Out: %d, Rendered: %d\n",
+    //            totalChunks, chunksInFrustum + chunksOutOfFrustum,
+    //            chunksInFrustum, chunksOutOfFrustum, chunksRendered);
+    // }
 }
 
 void World::update()
 {
-    int chunksLoadedThisFrame = 0;
-    int chunksUnloadedThisFrame = 0;
-    int chunksMeshedThisFrame = 0;
-    int chunksUploadedThisFrame = 0;
-
     int renderDistance = Constants::RENDER_DISTANCE;
     ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera.Position));
 
     // load new chunks
     loadVisibleChunks(playerPos, renderDistance);
-
     // 2. Process chunks ready for mesh generation
     processTerrainToMesh();
-
     // 3. Process chunks ready for GPU upload (MUST be on main thread)
     processMeshToGPU();
-
     // 4. Unload chunks
     unloadDistantChunks(playerPos);
 }
@@ -113,6 +127,7 @@ Block World::getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos)
 
 Block World::getBlockAt(glm::vec3 worldPos) const
 {
+    static Block airBlock;
     // Round the world position down to the nearest integers to get block-aligned coordinates
     glm::ivec3 worldCoords = glm::floor(worldPos);
 
@@ -198,8 +213,6 @@ void World::loadVisibleChunks(const ChunkCoord &playerPos, const int renderDista
             if (loadedChunks.find(chunkCoord) == loadedChunks.end() && isInRenderDistance(chunkCoord.x, chunkCoord.z, playerPos.x, playerPos.z))
             {
                 loadChunk(chunkCoord);
-                // std::cout << "Loading chunk: " << chunkCoord.x << ", " << chunkCoord.z << std::endl;
-                // chunksLoadedThisFrame++;
             }
         }
     }
@@ -212,6 +225,7 @@ void World::processTerrainToMesh()
     {
         // get a lock since it access meshGenQueue
         std::unique_lock<std::mutex> lock(meshGenMutex);
+        meshGenReady.reserve(meshGenQueue.size());
         // push everthing to meshGenReady vector
         while (!meshGenQueue.empty())
         {
@@ -220,10 +234,10 @@ void World::processTerrainToMesh()
         }
     }
 
-    for (auto chunk : meshGenReady)
+    for (const auto &chunk : meshGenReady)
     {
         // make sure chunk's terrain is generated and it isn't unloaded
-        if (chunk->state == ChunkState::TERRAIN_GENERATED && loadedChunks.find(chunk->worldPos) != loadedChunks.end())
+        if (chunk->state == ChunkState::TERRAIN_GENERATED && loadedChunks.find(chunk->chunkCoord) != loadedChunks.end())
         {
             // start mesh generation on worker thread
             chunkThreadPool.enqueue([this, chunk]() { //
@@ -234,7 +248,6 @@ void World::processTerrainToMesh()
                     uploadQueue.push(chunk);
                 }
             });
-            // chunksMeshedThisFrame++;
         }
     }
 }
@@ -245,6 +258,7 @@ void World::processMeshToGPU()
     {
         // get a lock since it access meshGenQueue
         std::unique_lock<std::mutex> lock(uploadMutex);
+        uploadReady.reserve(uploadQueue.size());
         // push everthing to meshGenReady vector
         while (!uploadQueue.empty())
         {
@@ -253,15 +267,14 @@ void World::processMeshToGPU()
         }
     }
 
-    for (auto chunk : uploadReady)
+    for (const auto &chunk : uploadReady)
     {
         // make sure chunk isn't unloaded
-        if (chunk->state == ChunkState::MESH_READY_FOR_UPLOAD && loadedChunks.find(chunk->worldPos) != loadedChunks.end())
+        if (chunk->state == ChunkState::MESH_READY_FOR_UPLOAD && loadedChunks.find(chunk->chunkCoord) != loadedChunks.end())
         {
             // Keep on main thread since it uses OpenGL related things
             chunk->uploadMeshToGPU();
             chunk->state = ChunkState::LOADED;
-            // chunksMeshedThisFrame++;
         }
     }
 }
@@ -284,7 +297,6 @@ void World::unloadDistantChunks(const ChunkCoord &playerPos)
     for (const ChunkCoord coord : chunkPositionsToRemove)
     {
         unloadChunk(coord);
-        // chunksUnloadedThisFrame++;
     }
 }
 

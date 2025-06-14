@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <atomic>
+#include <glm/glm.hpp>
 
 #include "Block.h"
 #include "Constants.h"
@@ -21,6 +22,12 @@ struct Vertex
     glm::vec2 uvs;
 };
 
+struct BoundingBox
+{
+    glm::vec3 min;
+    glm::vec3 max;
+};
+
 enum class ChunkState
 {
     EMPTY,                 // Just created, no data yet
@@ -35,7 +42,8 @@ class Chunk
 {
 
 public:
-    ChunkCoord worldPos;
+    ChunkCoord chunkCoord;
+    BoundingBox boundingBox;
     ChunkState state = ChunkState::EMPTY;
 
     bool modelMatrixDirty = true;
