@@ -56,7 +56,7 @@ void Application::initWindow()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // window creation
-    window = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "MineCraft Clone", NULL, NULL);
+    window = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "Minecraft Clone", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -66,7 +66,7 @@ void Application::initWindow()
     glfwMakeContextCurrent(window);
 
     // Enable VSync
-    // glfwSwapInterval(1);
+    glfwSwapInterval(1);
 }
 
 void Application::initOpenGL()

@@ -60,7 +60,7 @@ void World::update()
     loadVisibleChunks(playerPos, renderDistance);
     // 2. Process chunks ready for mesh generation
     processTerrainToMesh();
-    // 3. Process chunks ready for GPU upload (MUST be on main thread)
+    // 3. Process chunks ready for GPU upload
     processMeshToGPU();
     // 4. Unload chunks
     unloadDistantChunks(playerPos);
@@ -260,10 +260,12 @@ void World::processMeshToGPU()
         std::unique_lock<std::mutex> lock(uploadMutex);
         uploadReady.reserve(uploadQueue.size());
         // push everthing to meshGenReady vector
-        while (!uploadQueue.empty())
+        int count = 0;
+        while (!uploadQueue.empty() && count < Constants::MAX_CHUNKS_PER_FRAME)
         {
             uploadReady.push_back(uploadQueue.front());
             uploadQueue.pop();
+            count++;
         }
     }
 

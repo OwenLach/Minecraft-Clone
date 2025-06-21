@@ -31,10 +31,10 @@ target_include_directories(imgui PUBLIC
 
 # Executable
 file(GLOB_RECURSE SOURCES "src/*.cpp")
-add_executable(opengl_test ${SOURCES})
+add_executable(minecraft_clone ${SOURCES})
 
 # Include directories
-target_include_directories(opengl_test PRIVATE
+target_include_directories(minecraft_clone PRIVATE
     include
     libs/glad/include
     libs/glfw/include
@@ -44,7 +44,7 @@ target_include_directories(opengl_test PRIVATE
 )
 
 # Link libraries
-target_link_libraries(opengl_test
+target_link_libraries(minecraft_clone
     glad
     glfw
     imgui

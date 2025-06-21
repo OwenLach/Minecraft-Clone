@@ -13,6 +13,7 @@
 #include "VertexBuffer.h"
 #include "VertexBufferLayout.h"
 #include "ChunkCoord.h"
+#include "FastNoiseLite.h"
 
 class World;
 
@@ -74,12 +75,17 @@ private:
 
     glm::mat4 modelMatrix;
 
+    FastNoiseLite terrainNoise;
+    FastNoiseLite caveNoise;
+
     void generateBlockMesh(const Block &block);
-    std::vector<float> generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs) const;
+    void generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs);
     void addBlockFace(const Block &block, const BlockType type, const BlockFaces face);
 
     BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset);
     inline bool blockInChunkBounds(const glm::ivec3 &pos) const;
     inline bool isTransparent(BlockType type) const;
     inline size_t getBlockIndex(const glm::ivec3 &pos) const;
+    float getCaveNoise(const float x, const float y, const float z);
+    float getTerrainNoise(const float x, const float z);
 };

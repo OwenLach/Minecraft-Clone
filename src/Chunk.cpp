@@ -1,3 +1,8 @@
+#include "Chunk.h"
+#include "BlockTypes.h"
+#include "World.h"
+#include "FastNoiseLite.h"
+
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -6,11 +11,7 @@
 #include <iostream>
 #include <array>
 #include <vector>
-
-#include "Chunk.h"
-#include "BlockTypes.h"
-#include "World.h"
-#include "FastNoiseLite.h"
+#include <cmath>
 
 static constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
     {1, 0, 0},  // Right
@@ -111,9 +112,8 @@ void Chunk::generateMesh()
 
 void Chunk::generateTerrain()
 {
-    FastNoiseLite noise;
-    noise.SetFrequency(0.01f);
-    noise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_Perlin);
+    terrainNoise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_Perlin);
+    caveNoise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_OpenSimplex2);
 
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
     {
@@ -125,23 +125,31 @@ void Chunk::generateTerrain()
                 float worldX = chunkCoord.x * Constants::CHUNK_SIZE_X + x;
                 float worldZ = chunkCoord.z * Constants::CHUNK_SIZE_Z + z;
 
-                float noiseVal = noise.GetNoise(worldX, worldZ);
-                int height = Constants::TERRAIN_BASE_HEIGHT + (int)(noiseVal * Constants::TERRAIN_HEIGHT_VARIATION);
+                float terrainNoise = getTerrainNoise(worldX, worldZ); // [0 - 1]
+                float centeredNoise = terrainNoise - 0.5f;            // -0.5 to 0.5
+                int height = Constants::TERRAIN_BASE_HEIGHT + (int)(centeredNoise * Constants::TERRAIN_HEIGHT_VARIATION * 2.0f);
 
                 BlockType type;
-                if (y < height - 5)
+                if (y > height)
                 {
-                    type = BlockType::Stone;
-                }
-                else if (y < height)
-                {
-                    type = BlockType::Dirt;
+                    type = BlockType::Air;
                 }
                 else if (y == height)
                 {
                     type = BlockType::Grass;
                 }
+                else if (y < height && y > Constants::STONE_LEVEL)
+                {
+                    type = BlockType::Dirt;
+                }
                 else
+                {
+                    type = BlockType::Stone;
+                }
+
+                // Cave generation
+                float caveVal = getCaveNoise(worldX, (float)y, worldZ);
+                if (y < height - 5 && caveVal > Constants::CAVE_THRESHOLD)
                 {
                     type = BlockType::Air;
                 }
@@ -152,6 +160,44 @@ void Chunk::generateTerrain()
             }
         }
     }
+}
+
+float Chunk::getCaveNoise(const float x, const float y, const float z)
+{
+    // Large cave systems
+    caveNoise.SetFrequency(0.02f);
+    float largeCaves = caveNoise.GetNoise(x, y, z) * 0.5f;
+
+    // Medium cave details
+    caveNoise.SetFrequency(0.03f);
+    float mediumCaves = caveNoise.GetNoise(x, y, z) * 0.3f;
+
+    // Small cave details
+    caveNoise.SetFrequency(0.05f);
+    float smallCaves = caveNoise.GetNoise(x, y, z) * 0.2f;
+
+    // normalize [0 - 1]
+    return (largeCaves + mediumCaves + smallCaves + 1) * 0.5f;
+}
+
+float Chunk::getTerrainNoise(const float x, const float z)
+{
+    float result = 0.0f;
+    float amplitude = 1.0f;
+    float frequency = 0.3f;
+    float maxValue = 0.0f;
+
+    // 4 octaves with proper scaling
+    for (int i = 0; i < 5; i++)
+    {
+        result += terrainNoise.GetNoise(x * frequency, z * frequency) * amplitude;
+        maxValue += amplitude;
+        amplitude *= 0.5f; // Each octave has half the amplitude
+        frequency *= 2.0f; // Each octave has double the frequency
+    }
+
+    // Normalize to [0, 1]
+    return (result / maxValue + 1.0f) * 0.5f;
 }
 
 void Chunk::generateBlockMesh(const Block &block)
@@ -175,7 +221,7 @@ void Chunk::generateBlockMesh(const Block &block)
     }
 }
 
-std::vector<float> Chunk::generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs) const
+void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs)
 {
     using Vec3 = glm::vec3;
     using Vec2 = glm::vec2;
@@ -323,15 +369,14 @@ std::vector<float> Chunk::generateFacevertices(const Block &block, BlockFaces fa
         vertices.insert(vertices.end(), {pos.x, pos.y, pos.z, uv.x, uv.y, ao});
     }
 
-    return vertices;
+    meshDataBuffer.insert(meshDataBuffer.end(), vertices.begin(), vertices.end());
+    // return vertices;
 }
 
 void Chunk::addBlockFace(const Block &block, const BlockType type, const BlockFaces face)
 {
     const std::vector<glm::vec2> faceUVs = textureAtlas->getFaceUVs(type, face);
-    const std::vector<float> rawVertices = generateFacevertices(block, face, faceUVs);
-
-    meshDataBuffer.insert(meshDataBuffer.end(), rawVertices.begin(), rawVertices.end());
+    generateFacevertices(block, face, faceUVs);
 }
 
 BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset)
