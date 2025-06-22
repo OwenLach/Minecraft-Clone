@@ -60,7 +60,7 @@ public:
     void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);
     void ProcessMouseScroll(float yoffset);
 
-    bool isAABBInFrustum(BoundingBox &boundingBox) const;
+    bool isAABBInFrustum(const BoundingBox &boundingBox) const;
 
 private:
     // calculates the front vector from the Camera's (updated) Euler Angles

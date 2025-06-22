@@ -14,10 +14,10 @@
 #include <iostream>
 
 Application::Application()
-    : lastFrame(0.0f),
-      fpsTimer(0.0f),
-      frameCount(0),
-      fpsToDisplay(0.0f)
+    : lastFrame_(0.0f),
+      fpsTimer_(0.0f),
+      frameCount_(0),
+      fpsToDisplay_(0.0f)
 {
 }
 
@@ -56,14 +56,14 @@ void Application::initWindow()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // window creation
-    window = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "Minecraft Clone", NULL, NULL);
-    if (!window)
+    window_ = glfwCreateWindow(Constants::SCREEN_W, Constants::SCREEN_H, "Minecraft Clone", NULL, NULL);
+    if (!window_)
     {
         glfwTerminate();
         throw std::runtime_error("Failed to make GLFW window");
     }
 
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(window_);
 
     // Enable VSync
     glfwSwapInterval(1);
@@ -76,22 +76,18 @@ void Application::initOpenGL()
     {
         throw std::runtime_error("Failed to initialize OpenGL");
     }
-
-    // Log OpenGL info
-    // std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
-    // std::cout << "GPU: " << glGetString(GL_RENDERER) << std::endl;
 }
 
 void Application::initComponents()
 {
-    camera = std::make_unique<Camera>(glm::vec3(0.0f, -100.0f, 0.0f));
-    inputManager = std::make_unique<InputManager>(camera.get());
+    camera_ = std::make_unique<Camera>(glm::vec3(0.0f, -100.0f, 0.0f));
+    inputManager_ = std::make_unique<InputManager>(camera_.get());
     setupInputCallbacks();
-    textureAtlas = std::make_unique<TextureAtlas>();
-    shader = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
-    imguiManager = std::make_unique<ImGuiManager>(window);
-    world = std::make_unique<World>(*shader, textureAtlas.get(), *camera);
-    crosshair = std::make_unique<Crosshair>();
+    textureAtlas_ = std::make_unique<TextureAtlas>();
+    shader_ = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
+    imguiManager_ = std::make_unique<ImGuiManager>(window_);
+    world_ = std::make_unique<World>(*camera_, *shader_, textureAtlas_.get());
+    crosshair_ = std::make_unique<Crosshair>();
 }
 
 void Application::shutdown()
@@ -101,7 +97,7 @@ void Application::shutdown()
 
 void Application::mainLoop()
 {
-    while (!glfwWindowShouldClose(window))
+    while (!glfwWindowShouldClose(window_))
     {
         float dt = getDeltaTime();
 
@@ -109,7 +105,7 @@ void Application::mainLoop()
         update(dt);
         render();
 
-        glfwSwapBuffers(window);
+        glfwSwapBuffers(window_);
         glfwPollEvents();
     }
 }
@@ -123,25 +119,22 @@ void Application::render()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureAtlas->ID);
+    glBindTexture(GL_TEXTURE_2D, textureAtlas_->ID);
 
-    // activate shader
-    shader->use();
-    // pass projection matrix to shader
-    shader->setMat4("projection", camera->getProjectionMatrix());
-    // set the view matrix
-    shader->setMat4("view", camera->getViewMatrix());
+    shader_->use();
+    shader_->setMat4("projection", camera_->getProjectionMatrix());
+    shader_->setMat4("view", camera_->getViewMatrix());
 
-    world->render();
-    crosshair->render();
-    imguiManager->render();
+    world_->render();
+    crosshair_->render();
+    imguiManager_->render();
 }
 
 void Application::update(const float dt)
 {
     updateFPS(dt);
-    world->update();
-    imguiManager->update();
+    world_->update();
+    imguiManager_->update();
     setupImGuiUI();
 }
 
@@ -160,37 +153,37 @@ void Application::setGLRenderState()
 void Application::setupInputCallbacks()
 {
     // set camera to the window
-    glfwSetWindowUserPointer(window, inputManager.get());
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetWindowUserPointer(window_, inputManager_.get());
+    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    glfwSetFramebufferSizeCallback(window, InputManager::framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, InputManager::mouse_callback);
-    glfwSetScrollCallback(window, InputManager::scroll_callback);
+    glfwSetFramebufferSizeCallback(window_, InputManager::framebuffer_size_callback);
+    glfwSetCursorPosCallback(window_, InputManager::mouse_callback);
+    glfwSetScrollCallback(window_, InputManager::scroll_callback);
 }
 
 float Application::getDeltaTime()
 {
     float currentFrame = static_cast<float>(glfwGetTime());
-    float deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
+    float deltaTime = currentFrame - lastFrame_;
+    lastFrame_ = currentFrame;
 
     return deltaTime;
 }
 
 void Application::processInput(float dt)
 {
-    inputManager->processKeyboard(window, dt);
+    inputManager_->processKeyboard(window_, dt);
 }
 
 void Application::updateFPS(const float dt)
 {
-    frameCount++;
-    fpsTimer += dt;
-    if (fpsTimer >= 0.5f) // update every 0.5 seconds
+    frameCount_++;
+    fpsTimer_ += dt;
+    if (fpsTimer_ >= 0.5f) // update every 0.5 seconds
     {
-        fpsToDisplay = frameCount / fpsTimer;
-        fpsTimer = 0.0f;
-        frameCount = 0;
+        fpsToDisplay_ = frameCount_ / fpsTimer_;
+        fpsTimer_ = 0.0f;
+        frameCount_ = 0;
     }
 }
 
@@ -198,10 +191,10 @@ void Application::setupImGuiUI()
 {
     ImGui::Begin("Stats");
     ImGui::SetWindowSize(ImVec2(300, 90));
-    ImGui::Text("FPS: %.1f", fpsToDisplay);
-    glm::vec3 camPos = camera->Position;
+    ImGui::Text("FPS: %.1f", fpsToDisplay_);
+    glm::vec3 camPos = camera_->Position;
     ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
-    float zoom = camera->Zoom;
+    float zoom = camera_->Zoom;
     ImGui::Text("FOV: (%.2f)", zoom);
     ImGui::End();
 }

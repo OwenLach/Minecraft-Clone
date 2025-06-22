@@ -1,6 +1,6 @@
 #include "Chunk.h"
 #include "BlockTypes.h"
-#include "World.h"
+#include "ChunkManager.h"
 #include "FastNoiseLite.h"
 
 #include <glad/glad.h>
@@ -22,8 +22,8 @@ static constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
     {0, 0, -1}  // Back
 }};
 
-Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world_)
-    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), world_(world_)
+Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, ChunkManager *chunkManager)
+    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), chunkManager_(chunkManager)
 {
     const int chunkSize_X = Constants::CHUNK_SIZE_X;
     const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
@@ -161,6 +161,26 @@ void Chunk::generateTerrain()
             }
         }
     }
+}
+
+void Chunk::setState(ChunkState state)
+{
+    state_ = state;
+}
+
+const ChunkCoord Chunk::getCoord() const
+{
+    return chunkCoord_;
+}
+
+const BoundingBox Chunk::getBoundingBox() const
+{
+    return boundingBox_;
+}
+
+ChunkState Chunk::getState() const
+{
+    return state_;
 }
 
 void Chunk::generateBlockMesh(const Block &block)
@@ -301,11 +321,11 @@ void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std:
 
         // get the ao using curr block position + ao offsets
         // 0 = darkest, 3 = brightest
-        glm::ivec3 blockWorldCoords = world_->chunkToWorldCoords(chunkCoord_, block.position);
+        glm::ivec3 blockWorldCoords = chunkManager_->chunkToWorldCoords(chunkCoord_, block.position);
 
-        bool side1 = world_->isBlockSolid(blockWorldCoords + offsets[0]);
-        bool side2 = world_->isBlockSolid(blockWorldCoords + offsets[1]);
-        bool corner = world_->isBlockSolid(blockWorldCoords + offsets[2]);
+        bool side1 = chunkManager_->isBlockSolid(blockWorldCoords + offsets[0]);
+        bool side2 = chunkManager_->isBlockSolid(blockWorldCoords + offsets[1]);
+        bool corner = chunkManager_->isBlockSolid(blockWorldCoords + offsets[2]);
         int aoValue = computeAO(side1, side2, corner);
 
         // get aoValue in range[0 - 1]
@@ -351,15 +371,15 @@ BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec
     {
         return getBlockLocal(neighborLocalPos).type;
     }
-    // get it using world_ coords
+    // get it using chunkManager_ coords
     else
     {
-        // get blocks world_ positoins
-        glm::ivec3 blockWorldPos = world_->chunkToWorldCoords(chunkCoord_, blockPos);
-        // get neighbors world_ pos using blocks position
+        // get blocks chunkManager_ positoins
+        glm::ivec3 blockWorldPos = chunkManager_->chunkToWorldCoords(chunkCoord_, blockPos);
+        // get neighbors chunkManager_ pos using blocks position
         glm::ivec3 neighborWorldPos = blockWorldPos + offset;
         // get type of neighbor
-        return world_->getBlockGlobal(neighborWorldPos).type;
+        return chunkManager_->getBlockGlobal(neighborWorldPos).type;
     }
 }
 
