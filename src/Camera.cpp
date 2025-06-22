@@ -99,7 +99,7 @@ void Camera::ProcessMouseScroll(float yoffset)
     updateFrustum();
 }
 
-bool Camera::isAABBInFrustum(BoundingBox &boundingBox) const
+bool Camera::isAABBInFrustum(const BoundingBox &boundingBox) const
 {
     glm::vec3 min = boundingBox.min;
     glm::vec3 max = boundingBox.max;

@@ -16,7 +16,7 @@
 #include "FastNoiseLite.h"
 #include "TerrainGenerator.h"
 
-class World;
+class ChunkManager;
 
 struct Vertex
 {
@@ -45,12 +45,9 @@ class Chunk
 {
 
 public:
-    ChunkCoord chunkCoord_;
-    BoundingBox boundingBox_;
-    ChunkState state_ = ChunkState::EMPTY;
     std::atomic<bool> isDirty_ = true;
 
-    Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world_);
+    Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, ChunkManager *chunkManager);
 
     void renderChunk();
     void generateMesh();
@@ -59,22 +56,30 @@ public:
     void setDirty();
     void generateTerrain();
 
+    ChunkState getState() const;
+    void setState(ChunkState state);
+    const ChunkCoord getCoord() const;
+    const BoundingBox getBoundingBox() const;
+
     const Block &getBlockLocal(const glm::ivec3 &pos) const;
 
 private:
-    Shader &shader_;
-    TextureAtlas *textureAtlas_;
-    World *world_;
-    TerrainGenerator terrainGen_;
+    ChunkState state_ = ChunkState::EMPTY;
+    ChunkCoord chunkCoord_;
+    BoundingBox boundingBox_;
 
     std::vector<Block> blocks_;
     std::vector<float> meshDataBuffer_;
+
+    glm::mat4 modelMatrix_;
     size_t vertexCount_ = 0;
 
     VertexArray vao_;
     VertexBuffer vbo_;
-
-    glm::mat4 modelMatrix_;
+    Shader &shader_;
+    TextureAtlas *textureAtlas_;
+    ChunkManager *chunkManager_;
+    TerrainGenerator terrainGen_;
 
     void generateBlockMesh(const Block &block);
     void generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs);

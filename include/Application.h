@@ -4,8 +4,9 @@
 #include "Shader.h"
 #include "Chunk.h"
 #include "ImGuiManager.h"
-#include "World.h"
+#include "ChunkManager.h"
 #include "Crosshair.h"
+#include "World.h"
 
 struct GLFWwindow;
 
@@ -16,19 +17,19 @@ public:
     void run();
 
 private:
-    GLFWwindow *window;
-    std::unique_ptr<Camera> camera;
-    std::unique_ptr<InputManager> inputManager;
-    std::unique_ptr<Shader> shader;
-    std::unique_ptr<TextureAtlas> textureAtlas;
-    std::unique_ptr<ImGuiManager> imguiManager;
-    std::unique_ptr<World> world;
-    std::unique_ptr<Crosshair> crosshair;
+    GLFWwindow *window_;
+    std::unique_ptr<Camera> camera_;
+    std::unique_ptr<InputManager> inputManager_;
+    std::unique_ptr<Shader> shader_;
+    std::unique_ptr<TextureAtlas> textureAtlas_;
+    std::unique_ptr<ImGuiManager> imguiManager_;
+    std::unique_ptr<World> world_;
+    std::unique_ptr<Crosshair> crosshair_;
 
-    float lastFrame;
-    float fpsTimer;
-    int frameCount;
-    float fpsToDisplay;
+    float lastFrame_;
+    float fpsTimer_;
+    int frameCount_;
+    float fpsToDisplay_;
 
     void init();
     void initWindow();

@@ -5,12 +5,6 @@ Move chunk collection and lifecycle to ChunkManager
 Update all chunk access to go through ChunkManager
 Test chunk loading/unloading still works
 
-Phase 2: Extract TerrainGenerator
-
-Move all noise and generation logic to TerrainGenerator
-Update chunk generation to use TerrainGenerator
-Test terrain generation produces same results
-
 Phase 3: Extract MeshGenerator
 
 Move meshing logic to MeshGenerator
