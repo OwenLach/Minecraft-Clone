@@ -25,41 +25,38 @@ public:
     void loadChunk(ChunkCoord coord);
     void unloadChunk(ChunkCoord coord);
 
-    // Converts local block coordinates within a chunk to world coordinates.
     glm::ivec3 chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
-
-    // Converts a world-space block coordinate to its corresponding chunk coordinate.
     ChunkCoord worldToChunkCoords(glm::ivec3 worldCoords) const;
-
-    // Retrieves a block from a specific chunk using chunk coordinates and local block position.
-    Block getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos);
-
-    // Retrieves a block from the world using global world coordinates.
-    Block getBlockAt(glm::vec3 worldPos) const;
+    Block getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos);
+    Block getBlockGlobal(glm::vec3 worldPos) const;
 
     bool isBlockSolid(glm::ivec3 blockWorldPos) const;
 
 private:
-    Shader &shader;
-    TextureAtlas *textureAtlas;
-    Camera &camera;
+    Shader &shader_;
+    TextureAtlas *textureAtlas_;
+    Camera &camera_;
 
     // storage for loaded chunks, chunks might be in one of several states
-    std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks;
+    std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks_;
 
-    ThreadPool chunkThreadPool;
+    ThreadPool chunkThreadPool_;
 
-    std::queue<std::shared_ptr<Chunk>> meshGenQueue;
-    std::queue<std::shared_ptr<Chunk>> uploadQueue;
+    std::queue<std::shared_ptr<Chunk>> meshGenQueue_;
+    std::queue<std::shared_ptr<Chunk>> uploadQueue_;
+    std::queue<std::shared_ptr<Chunk>> meshRegenQueue_;
 
-    std::mutex meshGenMutex;
-    std::mutex uploadMutex;
+    std::mutex meshGenMutex_;
+    std::mutex uploadMutex_;
 
     void loadInitialChunks();
     void loadVisibleChunks(const ChunkCoord &playerPos, const int renderDistance);
     void processTerrainToMesh();
     void processMeshToGPU();
     void unloadDistantChunks(const ChunkCoord &playerPos);
+
+    void markNeighborChunksForMeshRegeneration(const ChunkCoord &coord);
+    bool allNeighborsLoaded(const ChunkCoord &coord);
 
     int getChunkDistanceSquaredFromPlayer(const ChunkCoord &chunk, const ChunkCoord &playerPos) const;
 

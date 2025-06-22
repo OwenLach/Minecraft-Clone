@@ -8,10 +8,10 @@
 #include <algorithm>
 
 World::World(Shader &shader, TextureAtlas *atlas, Camera &camera)
-    : shader(shader),
-      textureAtlas(atlas),
-      camera(camera),
-      chunkThreadPool(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() - 1 : 1)
+    : shader_(shader),
+      textureAtlas_(atlas),
+      camera_(camera),
+      chunkThreadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() - 1 : 1)
 {
     loadInitialChunks();
 }
@@ -23,12 +23,13 @@ void World::render()
     int chunksInFrustum = 0;
     int chunksOutOfFrustum = 0;
 
-    for (auto &[pos, chunk] : loadedChunks)
+    for (auto &[pos, chunk] : loadedChunks_)
     {
         totalChunks++;
-        if (chunk->state == ChunkState::LOADED)
+        if (chunk->state_ == ChunkState::LOADED ||
+            chunk->state_ == ChunkState::MESH_GENERATING)
         {
-            if (camera.isAABBInFrustum(chunk->boundingBox))
+            if (camera_.isAABBInFrustum(chunk->boundingBox_))
             {
                 chunk->renderChunk();
                 chunksRendered++;
@@ -54,7 +55,7 @@ void World::render()
 void World::update()
 {
     int renderDistance = Constants::RENDER_DISTANCE;
-    ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera.Position));
+    ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera_.Position));
 
     // load new chunks
     loadVisibleChunks(playerPos, renderDistance);
@@ -69,114 +70,39 @@ void World::update()
 void World::loadChunk(ChunkCoord coord)
 {
     // if its already loaded, return
-    if (loadedChunks.find(coord) != loadedChunks.end())
+    if (loadedChunks_.find(coord) != loadedChunks_.end())
         return;
 
-    // Create the chunk object. It starts in EMPTY state.
-    auto chunk = std::make_shared<Chunk>(shader, textureAtlas, coord, this);
-    chunk->state = ChunkState::TERRAIN_GENERATING;
-    loadedChunks.emplace(coord, chunk);
+    // Create the chunk object. It starts in EMPTY state_.
+    auto chunk = std::make_shared<Chunk>(shader_, textureAtlas_, coord, this);
+    chunk->state_ = ChunkState::TERRAIN_GENERATING;
+    loadedChunks_.emplace(coord, chunk);
 
     // Start terrain generation task for the worker threads
-    chunkThreadPool.enqueue([this, chunk]() { //
+    chunkThreadPool_.enqueue([this, chunk]() { //
         // starts generating terrain on worker thread
         chunk->generateTerrain();
         {
-            // get the lock to change state
-            std::unique_lock<std::mutex> mutex(meshGenMutex);
-            chunk->state = ChunkState::TERRAIN_GENERATED;
+            // get the lock to change state_
+            std::unique_lock<std::mutex> mutex(meshGenMutex_);
+            chunk->state_ = ChunkState::TERRAIN_GENERATED;
             // push to mesh gen queue
-            meshGenQueue.push(chunk);
+            meshGenQueue_.push(chunk);
         }
+        // mark neighbors to regenerate their mesh
+        markNeighborChunksForMeshRegeneration(chunk->chunkCoord_);
     });
 }
 
 void World::unloadChunk(ChunkCoord coord)
 {
-    loadedChunks.erase(coord);
-}
-
-glm::ivec3 World::chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const
-{
-    int x = chunkCoords.x * Constants::CHUNK_SIZE_X + localPos.x;
-    int y = localPos.y;
-    int z = chunkCoords.z * Constants::CHUNK_SIZE_Z + localPos.z;
-
-    return glm::ivec3(x, y, z);
-}
-
-ChunkCoord World::worldToChunkCoords(glm::ivec3 worldCoords) const
-{
-    int chunkX = glm::floor(worldCoords.x / (float)Constants::CHUNK_SIZE_X);
-    int chunkZ = glm::floor(worldCoords.z / (float)Constants::CHUNK_SIZE_Z);
-    return {chunkX, chunkZ};
-}
-
-Block World::getBlockAt(ChunkCoord chunkCoords, glm::vec3 blockPos)
-{
-    auto it = loadedChunks.find(chunkCoords);
-    if (it == loadedChunks.end())
-    {
-        static Block airBlock;
-        return airBlock;
-    }
-
-    Chunk *chunk = it->second.get();
-    return chunk->getBlockAt(blockPos);
-}
-
-Block World::getBlockAt(glm::vec3 worldPos) const
-{
-    static Block airBlock;
-    // Round the world position down to the nearest integers to get block-aligned coordinates
-    glm::ivec3 worldCoords = glm::floor(worldPos);
-
-    // Convert world coordinates to chunk coordinates
-    ChunkCoord chunkCoord = worldToChunkCoords(worldCoords);
-
-    // Convert world coordinates to local chunk coordinates
-    // Modulo math ensures correct wrapping even with negative positions
-    int localX = (worldCoords.x % Constants::CHUNK_SIZE_X + Constants::CHUNK_SIZE_X) % Constants::CHUNK_SIZE_X;
-    int localY = worldCoords.y;
-    int localZ = (worldCoords.z % Constants::CHUNK_SIZE_Z + Constants::CHUNK_SIZE_Z) % Constants::CHUNK_SIZE_Z;
-
-    glm::ivec3 localBlockPos = glm::ivec3(localX, localY, localZ);
-
-    // Attempt to find the chunk at the given chunk coordinates
-    auto it = loadedChunks.find(chunkCoord);
-    if (it == loadedChunks.end())
-    {
-        // If the chunk doesn't exist (e.g., out of render distance), return a default air block.
-        // This helps avoid errors and lets face culling work properly on chunk edges.
-        return Block(BlockType::Air, glm::ivec3(0));
-    }
-
-    // Sanity check: make sure local position is actually within bounds of the chunk
-    // This shouldn't happen due to the modulo math, but the check is defensive
-    if (localX >= 0 && localX < Constants::CHUNK_SIZE_X &&
-        localY >= 0 && localY < Constants::CHUNK_SIZE_Y &&
-        localZ >= 0 && localZ < Constants::CHUNK_SIZE_Z)
-    {
-        // If everything is valid, fetch the block from the chunk
-        return it->second->getBlockAt(glm::ivec3(localX, localY, localZ));
-    }
-    else
-    {
-        // If something went wrong (e.g., Y is out of bounds), return air to avoid a crash
-        return Block(BlockType::Air, glm::ivec3(0));
-    }
-}
-
-bool World::isBlockSolid(glm::ivec3 blockWorldPos) const
-{
-    Block block = getBlockAt(glm::vec3(blockWorldPos));
-    return block.type != BlockType::Air;
+    loadedChunks_.erase(coord);
 }
 
 void World::loadInitialChunks()
 {
     const int renderDistance = Constants::RENDER_DISTANCE;
-    const ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera.Position));
+    const ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera_.Position));
 
     std::vector<ChunkCoord> orderedChunks;
     // loops in a square
@@ -210,7 +136,7 @@ void World::loadVisibleChunks(const ChunkCoord &playerPos, const int renderDista
         for (int z = -renderDistance; z < renderDistance; z++)
         {
             ChunkCoord chunkCoord{playerPos.x + x, playerPos.z + z};
-            if (loadedChunks.find(chunkCoord) == loadedChunks.end() && isInRenderDistance(chunkCoord.x, chunkCoord.z, playerPos.x, playerPos.z))
+            if (loadedChunks_.find(chunkCoord) == loadedChunks_.end() && isInRenderDistance(chunkCoord.x, chunkCoord.z, playerPos.x, playerPos.z))
             {
                 loadChunk(chunkCoord);
             }
@@ -220,34 +146,40 @@ void World::loadVisibleChunks(const ChunkCoord &playerPos, const int renderDista
 
 void World::processTerrainToMesh()
 {
-    // iterate through the meshGenQueue
+    // iterate through the meshGenQueue_
     std::vector<std::shared_ptr<Chunk>> meshGenReady;
+    std::queue<std::shared_ptr<Chunk>> unreadyChunks;
     {
-        // get a lock since it access meshGenQueue
-        std::unique_lock<std::mutex> lock(meshGenMutex);
-        meshGenReady.reserve(meshGenQueue.size());
-        // push everthing to meshGenReady vector
-        while (!meshGenQueue.empty())
-        {
-            meshGenReady.push_back(meshGenQueue.front());
-            meshGenQueue.pop();
-        }
-    }
+        // get a lock since it access meshGenQueue_
+        std::unique_lock<std::mutex> lock(meshGenMutex_);
+        meshGenReady.reserve(meshGenQueue_.size());
 
-    for (const auto &chunk : meshGenReady)
-    {
-        // make sure chunk's terrain is generated and it isn't unloaded
-        if (chunk->state == ChunkState::TERRAIN_GENERATED && loadedChunks.find(chunk->chunkCoord) != loadedChunks.end())
+        while (!meshGenQueue_.empty())
         {
-            // start mesh generation on worker thread
-            chunkThreadPool.enqueue([this, chunk]() { //
-                chunk->generateMesh();
-                {
-                    std::unique_lock<std::mutex> lock(uploadMutex);
-                    chunk->state = ChunkState::MESH_READY_FOR_UPLOAD;
-                    uploadQueue.push(chunk);
-                }
-            });
+            auto chunk = meshGenQueue_.front();
+            meshGenQueue_.pop();
+            meshGenReady.push_back(chunk);
+        }
+
+        // loop through only the chunks ready
+        for (const auto &chunk : meshGenReady)
+        {
+            if ((chunk->state_ == ChunkState::TERRAIN_GENERATED ||
+                 chunk->state_ == ChunkState::MESH_GENERATING) &&
+                loadedChunks_.find(chunk->chunkCoord_) != loadedChunks_.end())
+            {
+                // start mesh generation on worker thread
+                chunkThreadPool_.enqueue([this, chunk]() { //
+                    chunk->generateMesh();
+                    {
+                        std::unique_lock<std::mutex> lock(uploadMutex_);
+                        chunk->state_ = ChunkState::MESH_READY_FOR_UPLOAD;
+                        uploadQueue_.push(chunk);
+
+                        chunk->isDirty_.store(false);
+                    }
+                });
+            }
         }
     }
 }
@@ -256,15 +188,15 @@ void World::processMeshToGPU()
 {
     std::vector<std::shared_ptr<Chunk>> uploadReady;
     {
-        // get a lock since it access meshGenQueue
-        std::unique_lock<std::mutex> lock(uploadMutex);
-        uploadReady.reserve(uploadQueue.size());
+        // get a lock since it access meshGenQueue_
+        std::unique_lock<std::mutex> lock(uploadMutex_);
+        uploadReady.reserve(uploadQueue_.size());
         // push everthing to meshGenReady vector
         int count = 0;
-        while (!uploadQueue.empty() && count < Constants::MAX_CHUNKS_PER_FRAME)
+        while (!uploadQueue_.empty() && count < Constants::MAX_CHUNKS_PER_FRAME)
         {
-            uploadReady.push_back(uploadQueue.front());
-            uploadQueue.pop();
+            uploadReady.push_back(uploadQueue_.front());
+            uploadQueue_.pop();
             count++;
         }
     }
@@ -272,11 +204,11 @@ void World::processMeshToGPU()
     for (const auto &chunk : uploadReady)
     {
         // make sure chunk isn't unloaded
-        if (chunk->state == ChunkState::MESH_READY_FOR_UPLOAD && loadedChunks.find(chunk->chunkCoord) != loadedChunks.end())
+        if (chunk->state_ == ChunkState::MESH_READY_FOR_UPLOAD && loadedChunks_.find(chunk->chunkCoord_) != loadedChunks_.end())
         {
             // Keep on main thread since it uses OpenGL related things
             chunk->uploadMeshToGPU();
-            chunk->state = ChunkState::LOADED;
+            chunk->state_ = ChunkState::LOADED;
         }
     }
 }
@@ -284,13 +216,14 @@ void World::processMeshToGPU()
 void World::unloadDistantChunks(const ChunkCoord &playerPos)
 {
     std::vector<ChunkCoord> chunkPositionsToRemove;
-    for (auto &[pos, chunk] : loadedChunks)
+    for (auto &[pos, chunk] : loadedChunks_)
     {
         // if chunk is in the middle of processing anything, don't unload
         if (!isInRenderDistance(pos.x, pos.z, playerPos.x, playerPos.z) &&
-            chunk->state != ChunkState::TERRAIN_GENERATING &&
-            chunk->state != ChunkState::MESH_GENERATING &&
-            chunk->state != ChunkState::MESH_READY_FOR_UPLOAD)
+            chunk->state_ != ChunkState::TERRAIN_GENERATING &&
+            chunk->state_ != ChunkState::MESH_GENERATING &&
+            chunk->state_ != ChunkState::MESH_READY_FOR_UPLOAD &&
+            chunk->state_ != ChunkState::MESH_REGENERATING)
         {
             chunkPositionsToRemove.push_back(pos);
         }
@@ -300,6 +233,124 @@ void World::unloadDistantChunks(const ChunkCoord &playerPos)
     {
         unloadChunk(coord);
     }
+}
+
+void World::markNeighborChunksForMeshRegeneration(const ChunkCoord &coord)
+{
+    if (!allNeighborsLoaded(coord))
+    {
+        return;
+    }
+
+    const int x = coord.x;
+    const int z = coord.z;
+    std::vector<ChunkCoord> neighbors = {
+        ChunkCoord{x + 1, z},
+        ChunkCoord{x - 1, z},
+        ChunkCoord{x, z + 1},
+        ChunkCoord{x, z - 1},
+    };
+
+    std::unique_lock<std::mutex> lock(meshGenMutex_);
+
+    for (const auto &neighborCoord : neighbors)
+    {
+        // if neighbor exists, is loaded, and isn't dirty
+        // set the new state_ to MESH_GENERATING and push back to meshGenQueue
+        auto chunk = loadedChunks_.find(neighborCoord);
+        if (chunk != loadedChunks_.end() &&
+            chunk->second->state_ == ChunkState::LOADED)
+        {
+            // Check and set isDirty_ atomically within the lock
+            bool expected = false;
+            if (chunk->second->isDirty_.compare_exchange_strong(expected, true))
+            {
+                chunk->second->state_ = ChunkState::MESH_GENERATING;
+                meshGenQueue_.push(chunk->second);
+            }
+            // If compare_exchange_strong failed, the chunk was already dirty/queued
+        }
+    }
+}
+
+bool World::allNeighborsLoaded(const ChunkCoord &coord)
+{
+    std::vector<ChunkCoord> neighbors = {
+        {coord.x + 1, coord.z},
+        {coord.x - 1, coord.z},
+        {coord.x, coord.z + 1},
+        {coord.x, coord.z - 1}};
+
+    for (auto &n : neighbors)
+    {
+        if (loadedChunks_.find(n) == loadedChunks_.end())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+Block World::getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos)
+{
+    auto it = loadedChunks_.find(chunkCoords);
+    if (it == loadedChunks_.end())
+    {
+        static Block airBlock;
+        return airBlock;
+    }
+
+    Chunk *chunk = it->second.get();
+    return chunk->getBlockLocal(blockPos);
+}
+
+Block World::getBlockGlobal(glm::vec3 worldPos) const
+{
+    // Round the world position down to the nearest integers to get block-aligned coordinates
+    glm::ivec3 worldCoords = glm::floor(worldPos);
+
+    // Convert world coordinates to chunk coordinates
+    ChunkCoord chunkCoord = worldToChunkCoords(worldCoords);
+
+    // Convert world coordinates to local chunk coordinates
+    // Modulo math ensures correct wrapping even with negative positions
+    int localX = (worldCoords.x % Constants::CHUNK_SIZE_X + Constants::CHUNK_SIZE_X) % Constants::CHUNK_SIZE_X;
+    int localY = worldCoords.y;
+    int localZ = (worldCoords.z % Constants::CHUNK_SIZE_Z + Constants::CHUNK_SIZE_Z) % Constants::CHUNK_SIZE_Z;
+
+    glm::ivec3 localBlockPos = glm::ivec3(localX, localY, localZ);
+
+    auto it = loadedChunks_.find(chunkCoord);
+    if (it != loadedChunks_.end())
+    {
+        return it->second->getBlockLocal(glm::ivec3(localX, localY, localZ));
+    }
+    else
+    {
+        // return a default air block if chunk isn't found
+        return Block(BlockType::Air, glm::ivec3(0));
+    }
+}
+
+bool World::isBlockSolid(glm::ivec3 blockWorldPos) const
+{
+    Block block = getBlockGlobal(glm::vec3(blockWorldPos));
+    return block.type != BlockType::Air;
+}
+
+glm::ivec3 World::chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const
+{
+    int x = chunkCoords.x * Constants::CHUNK_SIZE_X + localPos.x;
+    int y = localPos.y;
+    int z = chunkCoords.z * Constants::CHUNK_SIZE_Z + localPos.z;
+
+    return glm::ivec3(x, y, z);
+}
+
+ChunkCoord World::worldToChunkCoords(glm::ivec3 worldCoords) const
+{
+    int chunkX = glm::floor(worldCoords.x / (float)Constants::CHUNK_SIZE_X);
+    int chunkZ = glm::floor(worldCoords.z / (float)Constants::CHUNK_SIZE_Z);
+    return {chunkX, chunkZ};
 }
 
 int World::getChunkDistanceSquaredFromPlayer(const ChunkCoord &chunk, const ChunkCoord &playerPos) const

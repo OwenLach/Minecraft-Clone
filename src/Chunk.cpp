@@ -22,77 +22,79 @@ static constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
     {0, 0, -1}  // Back
 }};
 
-Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world)
-    : shader(shader), textureAtlas(atlas), chunkCoord(pos), world(world)
+Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, World *world_)
+    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), world_(world_)
 {
     const int chunkSize_X = Constants::CHUNK_SIZE_X;
     const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
     const int chunkSize_Z = Constants::CHUNK_SIZE_Z;
     // reserve for worse case
-    meshDataBuffer.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 36);
-    blocks.resize(chunkSize_X * chunkSize_Y * chunkSize_Z);
+    meshDataBuffer_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 36);
+    blocks_.resize(chunkSize_X * chunkSize_Y * chunkSize_Z);
 
-    boundingBox.min = glm::vec3(chunkCoord.x * chunkSize_X, -chunkSize_Y, chunkCoord.z * chunkSize_Z);
-    boundingBox.max = glm::vec3(chunkCoord.x * chunkSize_X + chunkSize_X, 0, chunkCoord.z * chunkSize_Z + chunkSize_Z);
+    boundingBox_.min = glm::vec3(chunkCoord_.x * chunkSize_X, -chunkSize_Y, chunkCoord_.z * chunkSize_Z);
+    boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, 0, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
 }
 
 void Chunk::renderChunk()
 {
     // make sure chunk is loaded
-    if (state != ChunkState::LOADED)
+    if (state_ != ChunkState::LOADED)
     {
         return;
     }
 
-    shader.use();
-    vao.bind();
+    shader_.use();
+    vao_.bind();
 
     glm::mat4 model = glm::mat4(1.0f);
-    modelMatrix = glm::translate(model, glm::vec3(chunkCoord.x * Constants::CHUNK_SIZE_X,
-                                                  -Constants::CHUNK_SIZE_Y,
-                                                  chunkCoord.z * Constants::CHUNK_SIZE_Z));
+    modelMatrix_ = glm::translate(model, glm::vec3(chunkCoord_.x * Constants::CHUNK_SIZE_X,
+                                                   -Constants::CHUNK_SIZE_Y,
+                                                   chunkCoord_.z * Constants::CHUNK_SIZE_Z));
 
-    shader.setMat4("model", modelMatrix);
-    glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+    shader_.setMat4("model", modelMatrix_);
+    glDrawArrays(GL_TRIANGLES, 0, vertexCount_);
 }
 
 void Chunk::uploadMeshToGPU()
 {
-    if (meshDataBuffer.empty())
+    if (meshDataBuffer_.empty())
     {
-        vertexCount = 0;
-        isDirty = false;
+        vertexCount_ = 0;
+        isDirty_ = false;
         return;
     }
 
-    vbo.setData(meshDataBuffer.data(), meshDataBuffer.size() * sizeof(float));
-    vertexCount = meshDataBuffer.size() / 5; // five float per vertex
+    vbo_.setData(meshDataBuffer_.data(), meshDataBuffer_.size() * sizeof(float));
+    vertexCount_ = meshDataBuffer_.size() / 5; // five float per vertex
 
     configureVertexAttributes();
-    meshDataBuffer.clear();
-    isDirty = false;
+    meshDataBuffer_.clear();
+    isDirty_ = false;
 }
 
 void Chunk::configureVertexAttributes()
 {
-    vao.bind();
+    vao_.bind();
     VertexBufferLayout layout;
     layout.push<float>(3); // position
     layout.push<float>(2); // texture coords
     layout.push<float>(1); // AO
-    vao.addBuffer(vbo, layout);
+    vao_.addBuffer(vbo_, layout);
 }
 
 void Chunk::setDirty()
 {
-    isDirty = true;
-    // modelMatrixDirty = true;
+    isDirty_ = true;
 }
 
 void Chunk::generateMesh()
 {
+    if (!isDirty_)
+        return;
+
     // clear previous mesh
-    meshDataBuffer.clear();
+    meshDataBuffer_.clear();
 
     // loop through chunk and generate each blocks mesh
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
@@ -101,7 +103,7 @@ void Chunk::generateMesh()
         {
             for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
             {
-                const Block &block = getBlockAt(glm::ivec3(x, y, z));
+                const Block &block = getBlockLocal(glm::ivec3(x, y, z));
 
                 if (block.type != BlockType::Air)
                     generateBlockMesh(block);
@@ -112,9 +114,6 @@ void Chunk::generateMesh()
 
 void Chunk::generateTerrain()
 {
-    terrainNoise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_Perlin);
-    caveNoise.SetNoiseType(FastNoiseLite::NoiseType::NoiseType_OpenSimplex2);
-
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
     {
         for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
@@ -122,11 +121,11 @@ void Chunk::generateTerrain()
             for (int y = 0; y < Constants::CHUNK_SIZE_Y; y++)
             {
 
-                float worldX = chunkCoord.x * Constants::CHUNK_SIZE_X + x;
-                float worldZ = chunkCoord.z * Constants::CHUNK_SIZE_Z + z;
+                float worldX = chunkCoord_.x * Constants::CHUNK_SIZE_X + x;
+                float worldZ = chunkCoord_.z * Constants::CHUNK_SIZE_Z + z;
 
-                float terrainNoise = getTerrainNoise(worldX, worldZ); // [0 - 1]
-                float centeredNoise = terrainNoise - 0.5f;            // -0.5 to 0.5
+                float terrainNoise = terrainGen_.getTerrainNoise(worldX, worldZ); // [0 - 1]
+                float centeredNoise = terrainNoise - 0.5f;                        // -0.5 to 0.5
                 int height = Constants::TERRAIN_BASE_HEIGHT + (int)(centeredNoise * Constants::TERRAIN_HEIGHT_VARIATION * 2.0f);
 
                 BlockType type;
@@ -148,56 +147,20 @@ void Chunk::generateTerrain()
                 }
 
                 // Cave generation
-                float caveVal = getCaveNoise(worldX, (float)y, worldZ);
-                if (y < height - 5 && caveVal > Constants::CAVE_THRESHOLD)
+                float caveVal = terrainGen_.getCaveNoise(worldX, (float)y, worldZ);
+                if (y < height - 5 &&
+                    caveVal > Constants::CAVE_THRESHOLD &&
+                    y > 0)
                 {
                     type = BlockType::Air;
                 }
 
                 glm::ivec3 pos = {x, y, z};
                 const size_t index = getBlockIndex(pos);
-                blocks[index] = Block(type, pos);
+                blocks_[index] = Block(type, pos);
             }
         }
     }
-}
-
-float Chunk::getCaveNoise(const float x, const float y, const float z)
-{
-    // Large cave systems
-    caveNoise.SetFrequency(0.02f);
-    float largeCaves = caveNoise.GetNoise(x, y, z) * 0.5f;
-
-    // Medium cave details
-    caveNoise.SetFrequency(0.03f);
-    float mediumCaves = caveNoise.GetNoise(x, y, z) * 0.3f;
-
-    // Small cave details
-    caveNoise.SetFrequency(0.05f);
-    float smallCaves = caveNoise.GetNoise(x, y, z) * 0.2f;
-
-    // normalize [0 - 1]
-    return (largeCaves + mediumCaves + smallCaves + 1) * 0.5f;
-}
-
-float Chunk::getTerrainNoise(const float x, const float z)
-{
-    float result = 0.0f;
-    float amplitude = 1.0f;
-    float frequency = 0.3f;
-    float maxValue = 0.0f;
-
-    // 4 octaves with proper scaling
-    for (int i = 0; i < 5; i++)
-    {
-        result += terrainNoise.GetNoise(x * frequency, z * frequency) * amplitude;
-        maxValue += amplitude;
-        amplitude *= 0.5f; // Each octave has half the amplitude
-        frequency *= 2.0f; // Each octave has double the frequency
-    }
-
-    // Normalize to [0, 1]
-    return (result / maxValue + 1.0f) * 0.5f;
 }
 
 void Chunk::generateBlockMesh(const Block &block)
@@ -338,11 +301,11 @@ void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std:
 
         // get the ao using curr block position + ao offsets
         // 0 = darkest, 3 = brightest
-        glm::ivec3 blockWorldCoords = world->chunkToWorldCoords(chunkCoord, block.position);
+        glm::ivec3 blockWorldCoords = world_->chunkToWorldCoords(chunkCoord_, block.position);
 
-        bool side1 = world->isBlockSolid(blockWorldCoords + offsets[0]);
-        bool side2 = world->isBlockSolid(blockWorldCoords + offsets[1]);
-        bool corner = world->isBlockSolid(blockWorldCoords + offsets[2]);
+        bool side1 = world_->isBlockSolid(blockWorldCoords + offsets[0]);
+        bool side2 = world_->isBlockSolid(blockWorldCoords + offsets[1]);
+        bool corner = world_->isBlockSolid(blockWorldCoords + offsets[2]);
         int aoValue = computeAO(side1, side2, corner);
 
         // get aoValue in range[0 - 1]
@@ -369,13 +332,13 @@ void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std:
         vertices.insert(vertices.end(), {pos.x, pos.y, pos.z, uv.x, uv.y, ao});
     }
 
-    meshDataBuffer.insert(meshDataBuffer.end(), vertices.begin(), vertices.end());
+    meshDataBuffer_.insert(meshDataBuffer_.end(), vertices.begin(), vertices.end());
     // return vertices;
 }
 
 void Chunk::addBlockFace(const Block &block, const BlockType type, const BlockFaces face)
 {
-    const std::vector<glm::vec2> faceUVs = textureAtlas->getFaceUVs(type, face);
+    const std::vector<glm::vec2> faceUVs = textureAtlas_->getFaceUVs(type, face);
     generateFacevertices(block, face, faceUVs);
 }
 
@@ -386,21 +349,21 @@ BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec
     // if it's in the chunk, just get it
     if (blockInChunkBounds(neighborLocalPos))
     {
-        return getBlockAt(neighborLocalPos).type;
+        return getBlockLocal(neighborLocalPos).type;
     }
-    // get it using world coords
+    // get it using world_ coords
     else
     {
-        // get blocks world positoins
-        glm::ivec3 blockWorldPos = world->chunkToWorldCoords(chunkCoord, blockPos);
-        // get neighbors world pos using blocks position
+        // get blocks world_ positoins
+        glm::ivec3 blockWorldPos = world_->chunkToWorldCoords(chunkCoord_, blockPos);
+        // get neighbors world_ pos using blocks position
         glm::ivec3 neighborWorldPos = blockWorldPos + offset;
         // get type of neighbor
-        return world->getBlockAt(neighborWorldPos).type;
+        return world_->getBlockGlobal(neighborWorldPos).type;
     }
 }
 
-const Block &Chunk::getBlockAt(const glm::ivec3 &pos) const
+const Block &Chunk::getBlockLocal(const glm::ivec3 &pos) const
 {
     if (!blockInChunkBounds(pos))
     {
@@ -410,7 +373,7 @@ const Block &Chunk::getBlockAt(const glm::ivec3 &pos) const
     }
 
     const size_t index = getBlockIndex(pos);
-    return blocks[index];
+    return blocks_[index];
 }
 
 inline bool Chunk::isTransparent(BlockType type) const
