@@ -27,6 +27,6 @@ namespace Constants
     constexpr float CAVE_START_Y = 50;
 
     // rendering settings
-    constexpr int RENDER_DISTANCE = 20;
+    constexpr int RENDER_DISTANCE = 10;
     constexpr int MAX_CHUNKS_PER_FRAME = 16;
 }

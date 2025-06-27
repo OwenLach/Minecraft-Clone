@@ -1,6 +1,6 @@
-#include "Chunk.h"
+#include "Chunk/Chunk.h"
+#include "Chunk/ChunkManager.h"
 #include "BlockTypes.h"
-#include "ChunkManager.h"
 #include "FastNoiseLite.h"
 
 #include <glad/glad.h>
@@ -36,10 +36,10 @@ Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, ChunkManager *
     boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, 0, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
 }
 
-void Chunk::renderChunk()
+void Chunk::render()
 {
     // make sure chunk is loaded
-    if (state_ != ChunkState::LOADED)
+    if (!stateMachine_.isReady())
     {
         return;
     }
@@ -146,14 +146,14 @@ void Chunk::generateTerrain()
                     type = BlockType::Stone;
                 }
 
-                // Cave generation
-                float caveVal = terrainGen_.getCaveNoise(worldX, (float)y, worldZ);
-                if (y < height - 5 &&
-                    caveVal > Constants::CAVE_THRESHOLD &&
-                    y > 0)
-                {
-                    type = BlockType::Air;
-                }
+                // // Cave generation
+                // float caveVal = terrainGen_.getCaveNoise(worldX, (float)y, worldZ);
+                // if (y < height - 5 &&
+                //     caveVal > Constants::CAVE_THRESHOLD &&
+                //     y > 0)
+                // {
+                //     type = BlockType::Air;
+                // }
 
                 glm::ivec3 pos = {x, y, z};
                 const size_t index = getBlockIndex(pos);
@@ -163,9 +163,14 @@ void Chunk::generateTerrain()
     }
 }
 
-void Chunk::setState(ChunkState state)
+ChunkState Chunk::getState() const
 {
-    state_ = state;
+    return stateMachine_.getState();
+}
+
+void Chunk::setState(ChunkState newState)
+{
+    stateMachine_.setState(newState);
 }
 
 const ChunkCoord Chunk::getCoord() const
@@ -176,11 +181,6 @@ const ChunkCoord Chunk::getCoord() const
 const BoundingBox Chunk::getBoundingBox() const
 {
     return boundingBox_;
-}
-
-ChunkState Chunk::getState() const
-{
-    return state_;
 }
 
 void Chunk::generateBlockMesh(const Block &block)

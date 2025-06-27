@@ -8,7 +8,7 @@
 #include <memory>
 
 #include "Constants.h"
-#include "Chunk.h"
+#include "Chunk/Chunk.h"
 #include "Shader.h"
 
 enum CameraMovement
