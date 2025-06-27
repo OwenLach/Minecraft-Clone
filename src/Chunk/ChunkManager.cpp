@@ -1,7 +1,8 @@
-#include "ChunkManager.h"
+#include "Chunk/ChunkManager.h"
+#include "Chunk/Chunk.h"
+#include "Chunk/ChunkStateMachine.h"
 #include "ThreadPool.h"
 #include "FastNoiseLite.h"
-#include "Chunk.h"
 
 #include <iostream>
 #include <thread>
@@ -18,38 +19,11 @@ ChunkManager::ChunkManager(Shader &shader, TextureAtlas *atlas, Camera &camera)
 
 void ChunkManager::render()
 {
-    int totalChunks = 0;
-    int chunksRendered = 0;
-    int chunksInFrustum = 0;
-    int chunksOutOfFrustum = 0;
-
     for (auto &[pos, chunk] : loadedChunks_)
     {
-        totalChunks++;
-        if (chunk->getState() == ChunkState::LOADED ||
-            chunk->getState() == ChunkState::MESH_GENERATING)
-        {
-            if (camera_.isAABBInFrustum(chunk->getBoundingBox()))
-            {
-                chunk->renderChunk();
-                chunksRendered++;
-                chunksInFrustum++;
-            }
-            else
-            {
-                chunksOutOfFrustum++;
-            }
-        }
+        if (camera_.isAABBInFrustum(chunk->getBoundingBox()))
+            chunk->render();
     }
-
-    // Print every few frames to avoid spam
-    // static int frameCount = 0;
-    // if (frameCount++ % 60 == 0)
-    // {
-    //     printf("Total: %d, Loaded: %d, In Frustum: %d, Out: %d, Rendered: %d\n",
-    //            totalChunks, chunksInFrustum + chunksOutOfFrustum,
-    //            chunksInFrustum, chunksOutOfFrustum, chunksRendered);
-    // }
 }
 
 void ChunkManager::update()
@@ -85,12 +59,12 @@ void ChunkManager::loadChunk(ChunkCoord coord)
         {
             // get the lock to change state_
             std::unique_lock<std::mutex> mutex(meshGenMutex_);
-            chunk->setState(ChunkState::TERRAIN_GENERATED);
+            chunk->setState(ChunkState::TERRAIN_READY);
             // push to mesh gen queue
             meshGenQueue_.push(chunk);
         }
         // mark neighbors to regenerate their mesh
-        markNeighborChunksForMeshRegeneration(chunk->getCoord());
+        // markNeighborChunksForMeshRegeneration(chunk->getCoord());
     });
 }
 
@@ -148,7 +122,6 @@ void ChunkManager::processTerrainToMesh()
 {
     // iterate through the meshGenQueue_
     std::vector<std::shared_ptr<Chunk>> meshGenReady;
-    std::queue<std::shared_ptr<Chunk>> unreadyChunks;
     {
         // get a lock since it access meshGenQueue_
         std::unique_lock<std::mutex> lock(meshGenMutex_);
@@ -164,16 +137,16 @@ void ChunkManager::processTerrainToMesh()
         // loop through only the chunks ready
         for (const auto &chunk : meshGenReady)
         {
-            if ((chunk->getState() == ChunkState::TERRAIN_GENERATED ||
-                 chunk->getState() == ChunkState::MESH_GENERATING) &&
+            if (chunk->getState() == ChunkState::TERRAIN_READY &&
                 loadedChunks_.find(chunk->getCoord()) != loadedChunks_.end())
             {
+                chunk->setState(ChunkState::MESH_GENERATING);
                 // start mesh generation on worker thread
                 chunkThreadPool_.enqueue([this, chunk]() { //
                     chunk->generateMesh();
                     {
                         std::unique_lock<std::mutex> lock(uploadMutex_);
-                        chunk->setState(ChunkState::MESH_READY_FOR_UPLOAD);
+                        chunk->setState(ChunkState::MESH_READY);
                         uploadQueue_.push(chunk);
 
                         chunk->isDirty_.store(false);
@@ -204,7 +177,8 @@ void ChunkManager::processMeshToGPU()
     for (const auto &chunk : uploadReady)
     {
         // make sure chunk isn't unloaded
-        if (chunk->getState() == ChunkState::MESH_READY_FOR_UPLOAD && loadedChunks_.find(chunk->getCoord()) != loadedChunks_.end())
+        if (chunk->getState() == ChunkState::MESH_READY &&
+            loadedChunks_.find(chunk->getCoord()) != loadedChunks_.end())
         {
             // Keep on main thread since it uses OpenGL related things
             chunk->uploadMeshToGPU();
@@ -222,8 +196,7 @@ void ChunkManager::unloadDistantChunks(const ChunkCoord &playerPos)
         if (!isInRenderDistance(pos.x, pos.z, playerPos.x, playerPos.z) &&
             chunk->getState() != ChunkState::TERRAIN_GENERATING &&
             chunk->getState() != ChunkState::MESH_GENERATING &&
-            chunk->getState() != ChunkState::MESH_READY_FOR_UPLOAD &&
-            chunk->getState() != ChunkState::MESH_REGENERATING)
+            chunk->getState() != ChunkState::MESH_READY)
         {
             chunkPositionsToRemove.push_back(pos);
         }

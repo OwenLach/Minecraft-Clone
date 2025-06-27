@@ -2,9 +2,9 @@
 #include "Camera.h"
 #include "InputManager.h"
 #include "Shader.h"
-#include "Chunk.h"
+#include "TextureAtlas.h"
+#include "Chunk/Chunk.h"
 #include "ImGuiManager.h"
-#include "ChunkManager.h"
 #include "Crosshair.h"
 #include "World.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ChunkManager.h"
+#include "Chunk/ChunkManager.h"
 #include "Camera.h"
 #include "TextureAtlas.h"
 #include "Shader.h"
