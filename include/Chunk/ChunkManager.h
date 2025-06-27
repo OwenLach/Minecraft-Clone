@@ -6,13 +6,14 @@
 
 #include <glm/glm.hpp>
 
-#include "Chunk.h"
+#include "Chunk/Chunk.h"
+#include "Chunk/ChunkCoord.h"
+#include "Chunk/ChunkPipeline.h"
+#include "Block.h"
+#include "ThreadPool.h"
 #include "Shader.h"
 #include "TextureAtlas.h"
-#include "ChunkCoord.h"
-#include "Block.h"
 #include "Camera.h"
-#include "ThreadPool.h"
 
 class ChunkManager
 {
@@ -37,25 +38,16 @@ private:
     TextureAtlas *textureAtlas_;
     Camera &camera_;
 
+    ChunkPipeline pipeline_;
+
     // storage for loaded chunks, chunks might be in one of several states
     std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks_;
 
-    ThreadPool chunkThreadPool_;
-
-    std::queue<std::shared_ptr<Chunk>> meshGenQueue_;
-    std::queue<std::shared_ptr<Chunk>> uploadQueue_;
-    std::queue<std::shared_ptr<Chunk>> meshRegenQueue_;
-
-    std::mutex meshGenMutex_;
-    std::mutex uploadMutex_;
-
     void loadInitialChunks();
     void loadVisibleChunks(const ChunkCoord &playerPos, const int renderDistance);
-    void processTerrainToMesh();
-    void processMeshToGPU();
     void unloadDistantChunks(const ChunkCoord &playerPos);
 
-    void markNeighborChunksForMeshRegeneration(const ChunkCoord &coord);
+    // void markNeighborChunksForMeshRegeneration(const ChunkCoord &coord);
     bool allNeighborsLoaded(const ChunkCoord &coord);
 
     int getChunkDistanceSquaredFromPlayer(const ChunkCoord &chunk, const ChunkCoord &playerPos) const;

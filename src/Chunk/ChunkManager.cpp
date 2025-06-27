@@ -1,6 +1,7 @@
 #include "Chunk/ChunkManager.h"
 #include "Chunk/Chunk.h"
 #include "Chunk/ChunkStateMachine.h"
+#include "Chunk/ChunkPipeline.h"
 #include "ThreadPool.h"
 #include "FastNoiseLite.h"
 
@@ -11,8 +12,7 @@
 ChunkManager::ChunkManager(Shader &shader, TextureAtlas *atlas, Camera &camera)
     : shader_(shader),
       textureAtlas_(atlas),
-      camera_(camera),
-      chunkThreadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() - 1 : 1)
+      camera_(camera)
 {
     loadInitialChunks();
 }
@@ -33,10 +33,10 @@ void ChunkManager::update()
 
     // load new chunks
     loadVisibleChunks(playerPos, renderDistance);
-    // 2. Process chunks ready for mesh generation
-    processTerrainToMesh();
-    // 3. Process chunks ready for GPU upload
-    processMeshToGPU();
+
+    // Processes the chunk pipeline
+    pipeline_.processAll();
+
     // 4. Unload chunks
     unloadDistantChunks(playerPos);
 }
@@ -47,25 +47,10 @@ void ChunkManager::loadChunk(ChunkCoord coord)
     if (loadedChunks_.find(coord) != loadedChunks_.end())
         return;
 
-    // Create the chunk object. It starts in EMPTY state_.
     auto chunk = std::make_shared<Chunk>(shader_, textureAtlas_, coord, this);
-    chunk->setState(ChunkState::TERRAIN_GENERATING);
     loadedChunks_.emplace(coord, chunk);
 
-    // Start terrain generation task for the worker threads
-    chunkThreadPool_.enqueue([this, chunk]() { //
-        // starts generating terrain on worker thread
-        chunk->generateTerrain();
-        {
-            // get the lock to change state_
-            std::unique_lock<std::mutex> mutex(meshGenMutex_);
-            chunk->setState(ChunkState::TERRAIN_READY);
-            // push to mesh gen queue
-            meshGenQueue_.push(chunk);
-        }
-        // mark neighbors to regenerate their mesh
-        // markNeighborChunksForMeshRegeneration(chunk->getCoord());
-    });
+    pipeline_.enqueueForTerrain(chunk);
 }
 
 void ChunkManager::unloadChunk(ChunkCoord coord)
@@ -118,75 +103,6 @@ void ChunkManager::loadVisibleChunks(const ChunkCoord &playerPos, const int rend
     }
 }
 
-void ChunkManager::processTerrainToMesh()
-{
-    // iterate through the meshGenQueue_
-    std::vector<std::shared_ptr<Chunk>> meshGenReady;
-    {
-        // get a lock since it access meshGenQueue_
-        std::unique_lock<std::mutex> lock(meshGenMutex_);
-        meshGenReady.reserve(meshGenQueue_.size());
-
-        while (!meshGenQueue_.empty())
-        {
-            auto chunk = meshGenQueue_.front();
-            meshGenQueue_.pop();
-            meshGenReady.push_back(chunk);
-        }
-
-        // loop through only the chunks ready
-        for (const auto &chunk : meshGenReady)
-        {
-            if (chunk->getState() == ChunkState::TERRAIN_READY &&
-                loadedChunks_.find(chunk->getCoord()) != loadedChunks_.end())
-            {
-                chunk->setState(ChunkState::MESH_GENERATING);
-                // start mesh generation on worker thread
-                chunkThreadPool_.enqueue([this, chunk]() { //
-                    chunk->generateMesh();
-                    {
-                        std::unique_lock<std::mutex> lock(uploadMutex_);
-                        chunk->setState(ChunkState::MESH_READY);
-                        uploadQueue_.push(chunk);
-
-                        chunk->isDirty_.store(false);
-                    }
-                });
-            }
-        }
-    }
-}
-
-void ChunkManager::processMeshToGPU()
-{
-    std::vector<std::shared_ptr<Chunk>> uploadReady;
-    {
-        // get a lock since it access meshGenQueue_
-        std::unique_lock<std::mutex> lock(uploadMutex_);
-        uploadReady.reserve(uploadQueue_.size());
-        // push everthing to meshGenReady vector
-        int count = 0;
-        while (!uploadQueue_.empty() && count < Constants::MAX_CHUNKS_PER_FRAME)
-        {
-            uploadReady.push_back(uploadQueue_.front());
-            uploadQueue_.pop();
-            count++;
-        }
-    }
-
-    for (const auto &chunk : uploadReady)
-    {
-        // make sure chunk isn't unloaded
-        if (chunk->getState() == ChunkState::MESH_READY &&
-            loadedChunks_.find(chunk->getCoord()) != loadedChunks_.end())
-        {
-            // Keep on main thread since it uses OpenGL related things
-            chunk->uploadMeshToGPU();
-            chunk->setState(ChunkState::LOADED);
-        }
-    }
-}
-
 void ChunkManager::unloadDistantChunks(const ChunkCoord &playerPos)
 {
     std::vector<ChunkCoord> chunkPositionsToRemove;
@@ -208,43 +124,43 @@ void ChunkManager::unloadDistantChunks(const ChunkCoord &playerPos)
     }
 }
 
-void ChunkManager::markNeighborChunksForMeshRegeneration(const ChunkCoord &coord)
-{
-    if (!allNeighborsLoaded(coord))
-    {
-        return;
-    }
+// void ChunkManager::markNeighborChunksForMeshRegeneration(const ChunkCoord &coord)
+// {
+//     if (!allNeighborsLoaded(coord))
+//     {
+//         return;
+//     }
 
-    const int x = coord.x;
-    const int z = coord.z;
-    std::vector<ChunkCoord> neighbors = {
-        ChunkCoord{x + 1, z},
-        ChunkCoord{x - 1, z},
-        ChunkCoord{x, z + 1},
-        ChunkCoord{x, z - 1},
-    };
+//     const int x = coord.x;
+//     const int z = coord.z;
+//     std::vector<ChunkCoord> neighbors = {
+//         ChunkCoord{x + 1, z},
+//         ChunkCoord{x - 1, z},
+//         ChunkCoord{x, z + 1},
+//         ChunkCoord{x, z - 1},
+//     };
 
-    std::unique_lock<std::mutex> lock(meshGenMutex_);
+//     std::unique_lock<std::mutex> lock(meshGenMutex_);
 
-    for (const auto &neighborCoord : neighbors)
-    {
-        // if neighbor exists, is loaded, and isn't dirty
-        // set the new state_ to MESH_GENERATING and push back to meshGenQueue
-        auto chunk = loadedChunks_.find(neighborCoord);
-        if (chunk != loadedChunks_.end() &&
-            chunk->second->getState() == ChunkState::LOADED)
-        {
-            // Check and set isDirty_ atomically within the lock
-            bool expected = false;
-            if (chunk->second->isDirty_.compare_exchange_strong(expected, true))
-            {
-                chunk->second->setState(ChunkState::MESH_GENERATING);
-                meshGenQueue_.push(chunk->second);
-            }
-            // If compare_exchange_strong failed, the chunk was already dirty/queued
-        }
-    }
-}
+//     for (const auto &neighborCoord : neighbors)
+//     {
+//         // if neighbor exists, is loaded, and isn't dirty
+//         // set the new state_ to MESH_GENERATING and push back to meshGenQueue
+//         auto chunk = loadedChunks_.find(neighborCoord);
+//         if (chunk != loadedChunks_.end() &&
+//             chunk->second->getState() == ChunkState::LOADED)
+//         {
+//             // Check and set isDirty_ atomically within the lock
+//             bool expected = false;
+//             if (chunk->second->isDirty_.compare_exchange_strong(expected, true))
+//             {
+//                 chunk->second->setState(ChunkState::MESH_GENERATING);
+//                 meshGenQueue_.push(chunk->second);
+//             }
+//             // If compare_exchange_strong failed, the chunk was already dirty/queued
+//         }
+//     }
+// }
 
 bool ChunkManager::allNeighborsLoaded(const ChunkCoord &coord)
 {
@@ -263,6 +179,7 @@ bool ChunkManager::allNeighborsLoaded(const ChunkCoord &coord)
     }
     return true;
 }
+
 Block ChunkManager::getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos)
 {
     auto it = loadedChunks_.find(chunkCoords);
