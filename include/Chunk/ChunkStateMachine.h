@@ -10,7 +10,8 @@ enum class ChunkState
     MESH_GENERATING,
     MESH_READY,
     LOADED,
-    UNLOADING
+    UNLOADING,
+    NEEDS_MESH_REGEN
 };
 
 class ChunkStateMachine
@@ -19,12 +20,13 @@ private:
     std::atomic<ChunkState> currentState_{ChunkState::EMPTY};
 
 public:
-    bool canTransitionTo(ChunkState newState) const;
     void setState(ChunkState state);
     ChunkState getState() const;
+    bool canTransitionTo(ChunkState newState) const;
     bool isProcessing() const;
     bool isReady() const;
     bool canUnload() const;
+    bool canRemesh() const;
 
     static const char *toString(ChunkState state);
 };

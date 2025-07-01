@@ -8,17 +8,20 @@
 #include <iostream>
 #include <thread>
 #include <algorithm>
+#include <iostream>
 
 ChunkManager::ChunkManager(Shader &shader, TextureAtlas *atlas, Camera &camera)
     : shader_(shader),
       textureAtlas_(atlas),
-      camera_(camera)
+      camera_(camera),
+      pipeline_(std::make_unique<ChunkPipeline>(*this))
 {
     loadInitialChunks();
 }
 
 void ChunkManager::render()
 {
+    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
     for (auto &[pos, chunk] : loadedChunks_)
     {
         if (camera_.isAABBInFrustum(chunk->getBoundingBox()))
@@ -31,26 +34,23 @@ void ChunkManager::update()
     int renderDistance = Constants::RENDER_DISTANCE;
     ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera_.Position));
 
-    // load new chunks
+    // Load new chunks
     loadVisibleChunks(playerPos, renderDistance);
 
     // Processes the chunk pipeline
-    pipeline_.processAll();
+    pipeline_->processAll();
 
-    // 4. Unload chunks
+    // Unload chunks
     unloadDistantChunks(playerPos);
 }
 
 void ChunkManager::loadChunk(ChunkCoord coord)
 {
-    // if its already loaded, return
-    if (loadedChunks_.find(coord) != loadedChunks_.end())
-        return;
-
     auto chunk = std::make_shared<Chunk>(shader_, textureAtlas_, coord, this);
     loadedChunks_.emplace(coord, chunk);
 
-    pipeline_.enqueueForTerrain(chunk);
+    // Chunk automatically starts out in EMPTY state;
+    pipeline_->enqueueForTerrain(chunk);
 }
 
 void ChunkManager::unloadChunk(ChunkCoord coord)
@@ -81,23 +81,46 @@ void ChunkManager::loadInitialChunks()
     std::sort(orderedChunks.begin(), orderedChunks.end(), [&playerPos, this](const ChunkCoord &a, const ChunkCoord &b)
               { return getChunkDistanceSquaredFromPlayer(playerPos, a) < getChunkDistanceSquaredFromPlayer(playerPos, b); });
 
-    // load closest to player first
-    for (const auto &chunk : orderedChunks)
     {
-        loadChunk(chunk);
+        // load closest to player first
+        std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
+        for (const auto &chunk : orderedChunks)
+        {
+            loadChunk(chunk);
+        }
     }
 }
 
 void ChunkManager::loadVisibleChunks(const ChunkCoord &playerPos, const int renderDistance)
 {
-    for (int x = -renderDistance; x < renderDistance; x++)
+    std::vector<ChunkCoord> chunksToLoad;
+
     {
-        for (int z = -renderDistance; z < renderDistance; z++)
+        std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+        for (int x = -renderDistance; x < renderDistance; x++)
         {
-            ChunkCoord chunkCoord{playerPos.x + x, playerPos.z + z};
-            if (loadedChunks_.find(chunkCoord) == loadedChunks_.end() && isInRenderDistance(chunkCoord.x, chunkCoord.z, playerPos.x, playerPos.z))
+            for (int z = -renderDistance; z < renderDistance; z++)
             {
-                loadChunk(chunkCoord);
+                ChunkCoord chunkCoord{playerPos.x + x, playerPos.z + z};
+
+                // Check if chunk is within the circular render distance
+                if (isInRenderDistance(chunkCoord.x, chunkCoord.z, playerPos.x, playerPos.z) &&
+                    loadedChunks_.count(chunkCoord) == 0)
+                {
+                    chunksToLoad.push_back(chunkCoord);
+                }
+            }
+        }
+    }
+
+    if (!chunksToLoad.empty())
+    {
+        std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
+        for (const auto &coord : chunksToLoad)
+        {
+            if (loadedChunks_.count(coord) == 0)
+            {
+                loadChunk(coord);
             }
         }
     }
@@ -106,73 +129,105 @@ void ChunkManager::loadVisibleChunks(const ChunkCoord &playerPos, const int rend
 void ChunkManager::unloadDistantChunks(const ChunkCoord &playerPos)
 {
     std::vector<ChunkCoord> chunkPositionsToRemove;
-    for (auto &[pos, chunk] : loadedChunks_)
     {
-        // if chunk is in the middle of processing anything, don't unload
-        if (!isInRenderDistance(pos.x, pos.z, playerPos.x, playerPos.z) &&
-            chunk->getState() != ChunkState::TERRAIN_GENERATING &&
-            chunk->getState() != ChunkState::MESH_GENERATING &&
-            chunk->getState() != ChunkState::MESH_READY)
+        // Shared for read only
+        std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+        for (auto &[pos, chunk] : loadedChunks_)
         {
-            chunkPositionsToRemove.push_back(pos);
+            // if chunk is in the middle of processing anything, don't unload
+            if (!isInRenderDistance(pos.x, pos.z, playerPos.x, playerPos.z) && chunk->canUnload())
+            {
+                chunkPositionsToRemove.push_back(pos);
+            }
         }
     }
 
-    for (const ChunkCoord coord : chunkPositionsToRemove)
+    if (!chunkPositionsToRemove.empty())
     {
-        unloadChunk(coord);
+
+        std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
+        for (const ChunkCoord coord : chunkPositionsToRemove)
+        {
+            unloadChunk(coord);
+        }
     }
 }
 
-// void ChunkManager::markNeighborChunksForMeshRegeneration(const ChunkCoord &coord)
-// {
-//     if (!allNeighborsLoaded(coord))
-//     {
-//         return;
-//     }
+void ChunkManager::markNeighborChunksForMeshRegeneration(const ChunkCoord &coord)
+{
+    // Return if the nei
+    if (!allNeighborsLoaded(coord))
+    {
+        return;
+    }
 
-//     const int x = coord.x;
-//     const int z = coord.z;
-//     std::vector<ChunkCoord> neighbors = {
-//         ChunkCoord{x + 1, z},
-//         ChunkCoord{x - 1, z},
-//         ChunkCoord{x, z + 1},
-//         ChunkCoord{x, z - 1},
-//     };
+    auto neighbors = getChunkNeighbors(coord);
+    for (const auto &n_chunkPtr : neighbors)
+    {
+        // The neighboring chunk exists and all its neighbors at least have their terrain ready && and the chunk can reme
+        if (n_chunkPtr && allNeighborsLoaded(n_chunkPtr->getCoord()) && n_chunkPtr->canRemesh())
+        {
+            // Mesh regeneration
+            bool expected = false;
+            if (n_chunkPtr->isDirty_.compare_exchange_strong(expected, true))
+            {
+                n_chunkPtr->setState(ChunkState::NEEDS_MESH_REGEN);
+                pipeline_->enqueueForRegen(n_chunkPtr);
+            }
+        }
+    }
+}
 
-//     std::unique_lock<std::mutex> lock(meshGenMutex_);
+std::array<std::shared_ptr<Chunk>, 4> ChunkManager::getChunkNeighbors(const ChunkCoord &coord)
+{
+    // Acquire a shared lock for thread-safe read access to loadedChunks_
+    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
 
-//     for (const auto &neighborCoord : neighbors)
-//     {
-//         // if neighbor exists, is loaded, and isn't dirty
-//         // set the new state_ to MESH_GENERATING and push back to meshGenQueue
-//         auto chunk = loadedChunks_.find(neighborCoord);
-//         if (chunk != loadedChunks_.end() &&
-//             chunk->second->getState() == ChunkState::LOADED)
-//         {
-//             // Check and set isDirty_ atomically within the lock
-//             bool expected = false;
-//             if (chunk->second->isDirty_.compare_exchange_strong(expected, true))
-//             {
-//                 chunk->second->setState(ChunkState::MESH_GENERATING);
-//                 meshGenQueue_.push(chunk->second);
-//             }
-//             // If compare_exchange_strong failed, the chunk was already dirty/queued
-//         }
-//     }
-// }
+    std::array<std::shared_ptr<Chunk>, 4> neighbors;
+
+    // North: +Z
+    // South: -Z
+    // East:  +X
+    // West:  -X
+    const ChunkCoord northCoord = {coord.x, coord.z + 1};
+    const ChunkCoord southCoord = {coord.x, coord.z - 1};
+    const ChunkCoord eastCoord = {coord.x + 1, coord.z};
+    const ChunkCoord westCoord = {coord.x - 1, coord.z};
+
+    auto it = loadedChunks_.find(northCoord);
+    if (it != loadedChunks_.end())
+    {
+        neighbors[0] = it->second; // Assign North chunk (index 0)
+    }
+
+    it = loadedChunks_.find(southCoord);
+    if (it != loadedChunks_.end())
+    {
+        neighbors[1] = it->second; // Assign South chunk (index 1)
+    }
+
+    it = loadedChunks_.find(eastCoord);
+    if (it != loadedChunks_.end())
+    {
+        neighbors[2] = it->second; // Assign East chunk (index 2)
+    }
+
+    it = loadedChunks_.find(westCoord);
+    if (it != loadedChunks_.end())
+    {
+        neighbors[3] = it->second; // Assign West chunk (index 3)
+    }
+
+    return neighbors;
+}
 
 bool ChunkManager::allNeighborsLoaded(const ChunkCoord &coord)
 {
-    std::vector<ChunkCoord> neighbors = {
-        {coord.x + 1, coord.z},
-        {coord.x - 1, coord.z},
-        {coord.x, coord.z + 1},
-        {coord.x, coord.z - 1}};
+    auto neighbors = getChunkNeighbors(coord);
 
-    for (auto &n : neighbors)
+    for (auto &n_chunkPtr : neighbors)
     {
-        if (loadedChunks_.find(n) == loadedChunks_.end())
+        if (!n_chunkPtr || n_chunkPtr->getState() < ChunkState::TERRAIN_READY)
         {
             return false;
         }
@@ -180,27 +235,39 @@ bool ChunkManager::allNeighborsLoaded(const ChunkCoord &coord)
     return true;
 }
 
+const std::shared_ptr<Chunk> ChunkManager::getChunk(const ChunkCoord &coord) const
+{
+    // Shared lock for read only
+    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+    auto it = loadedChunks_.find(coord);
+
+    if (it != loadedChunks_.end())
+    {
+        return it->second;
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
 Block ChunkManager::getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos)
 {
-    auto it = loadedChunks_.find(chunkCoords);
-    if (it == loadedChunks_.end())
+    auto chunkPtr = getChunk(chunkCoords);
+    if (!chunkPtr)
     {
         static Block airBlock;
         return airBlock;
     }
-
-    Chunk *chunk = it->second.get();
-    return chunk->getBlockLocal(blockPos);
+    return chunkPtr->getBlockLocal(blockPos);
 }
 
 Block ChunkManager::getBlockGlobal(glm::vec3 worldPos) const
 {
     // Round the ChunkManager position down to the nearest integers to get block-aligned coordinates
     glm::ivec3 worldCoords = glm::floor(worldPos);
-
     // Convert ChunkManager coordinates to chunk coordinates
     ChunkCoord chunkCoord = worldToChunkCoords(worldCoords);
-
     // Convert ChunkManager coordinates to local chunk coordinates
     // Modulo math ensures correct wrapping even with negative positions
     int localX = (worldCoords.x % Constants::CHUNK_SIZE_X + Constants::CHUNK_SIZE_X) % Constants::CHUNK_SIZE_X;
@@ -209,10 +276,10 @@ Block ChunkManager::getBlockGlobal(glm::vec3 worldPos) const
 
     glm::ivec3 localBlockPos = glm::ivec3(localX, localY, localZ);
 
-    auto it = loadedChunks_.find(chunkCoord);
-    if (it != loadedChunks_.end())
+    auto chunkPtr = getChunk(chunkCoord);
+    if (chunkPtr)
     {
-        return it->second->getBlockLocal(glm::ivec3(localX, localY, localZ));
+        return chunkPtr->getBlockLocal(glm::ivec3(localX, localY, localZ));
     }
     else
     {
@@ -232,7 +299,6 @@ glm::ivec3 ChunkManager::chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 l
     int x = chunkCoords.x * Constants::CHUNK_SIZE_X + localPos.x;
     int y = localPos.y;
     int z = chunkCoords.z * Constants::CHUNK_SIZE_Z + localPos.z;
-
     return glm::ivec3(x, y, z);
 }
 
@@ -247,6 +313,5 @@ int ChunkManager::getChunkDistanceSquaredFromPlayer(const ChunkCoord &chunk, con
 {
     const int dx = chunk.x - playerPos.x;
     const int dz = chunk.z - playerPos.z;
-
     return dx * dx + dz * dz;
 }

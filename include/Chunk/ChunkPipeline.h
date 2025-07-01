@@ -2,13 +2,18 @@
 
 #include <queue>
 #include <mutex>
+#include <atomic>
+#include <set>
 
 #include "ThreadPool.h"
 #include "Chunk/Chunk.h"
 
+class ChunkManager;
+
 class ChunkPipeline
 {
 private:
+    ChunkManager &chunkManager_;
     ThreadPool threadPool_;
 
     std::queue<std::shared_ptr<Chunk>> terrainQueue_;
@@ -20,7 +25,7 @@ private:
     std::mutex uploadMutex_;
 
 public:
-    ChunkPipeline();
+    ChunkPipeline(ChunkManager &chunkManager);
 
     void processTerrainQueue();
     void processMeshQueue();
@@ -30,4 +35,8 @@ public:
     void enqueueForTerrain(std::shared_ptr<Chunk> chunk);
     void enqueueForMesh(std::shared_ptr<Chunk> chunk);
     void enqueueForUpload(std::shared_ptr<Chunk> chunk);
+    void enqueueForRegen(std::shared_ptr<Chunk> chunk);
+
+    void markNeighborChunksForMeshRegeneration(const ChunkCoord &coord);
+    bool allNeighborsLoaded(const ChunkCoord &coord);
 };

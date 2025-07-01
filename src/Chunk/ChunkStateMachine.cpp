@@ -12,25 +12,32 @@ bool ChunkStateMachine::canTransitionTo(ChunkState newState) const
         return newState == ChunkState::TERRAIN_GENERATING;
 
     case ChunkState::TERRAIN_GENERATING:
-        return newState == ChunkState::TERRAIN_READY || newState == ChunkState::UNLOADING;
+        return newState == ChunkState::TERRAIN_READY ||
+               newState == ChunkState::UNLOADING;
 
     case ChunkState::TERRAIN_READY:
-        return newState == ChunkState::MESH_GENERATING || newState == ChunkState::UNLOADING;
+        return newState == ChunkState::MESH_GENERATING ||
+               newState == ChunkState::UNLOADING;
 
     case ChunkState::MESH_GENERATING:
-        return newState == ChunkState::MESH_READY || newState == ChunkState::UNLOADING;
+        return newState == ChunkState::MESH_READY ||
+               newState == ChunkState::UNLOADING;
 
     case ChunkState::MESH_READY:
         return newState == ChunkState::LOADED ||
-               newState == ChunkState::MESH_GENERATING || // Allow mesh regeneration
-               newState == ChunkState::UNLOADING;
+               newState == ChunkState::UNLOADING ||
+               newState == ChunkState::NEEDS_MESH_REGEN;
 
     case ChunkState::LOADED:
-        return newState == ChunkState::MESH_GENERATING || // Allow mesh regeneration
+        return newState == ChunkState::NEEDS_MESH_REGEN ||
                newState == ChunkState::UNLOADING;
 
     case ChunkState::UNLOADING:
         return newState == ChunkState::EMPTY;
+
+    case ChunkState::NEEDS_MESH_REGEN:
+        return newState == ChunkState::MESH_GENERATING ||
+               newState == ChunkState::UNLOADING;
     }
 
     return false;
@@ -70,6 +77,11 @@ bool ChunkStateMachine::canUnload() const
     return !isProcessing();
 }
 
+bool ChunkStateMachine::canRemesh() const
+{
+    ChunkState state = currentState_.load();
+    return (state == ChunkState::LOADED || state == ChunkState::MESH_READY || state == ChunkState::NEEDS_MESH_REGEN) && !isProcessing();
+}
 const char *ChunkStateMachine::toString(ChunkState state)
 {
     switch (state)
@@ -88,6 +100,8 @@ const char *ChunkStateMachine::toString(ChunkState state)
         return "LOADED";
     case ChunkState::UNLOADING:
         return "UNLOADING";
+    case ChunkState::NEEDS_MESH_REGEN:
+        return "NEEDS_MESH_REGEN";
     default:
         return "UNKNOWN";
     }

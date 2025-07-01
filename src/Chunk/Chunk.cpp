@@ -12,6 +12,7 @@
 #include <array>
 #include <vector>
 #include <cmath>
+#include <functional>
 
 static constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
     {1, 0, 0},  // Right
@@ -88,13 +89,11 @@ void Chunk::setDirty()
     isDirty_ = true;
 }
 
-void Chunk::generateMesh()
+void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    if (!isDirty_)
-        return;
-
-    // clear previous mesh
+    const size_t estimatedFaces = (Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z) / 4;
     meshDataBuffer_.clear();
+    meshDataBuffer_.reserve(estimatedFaces * 30); // 6 vertices * 5 floats per face
 
     // loop through chunk and generate each blocks mesh
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
@@ -103,13 +102,16 @@ void Chunk::generateMesh()
         {
             for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
             {
-                const Block &block = getBlockLocal(glm::ivec3(x, y, z));
+                const size_t index = getBlockIndex(glm::ivec3(x, y, z));
+                const Block &block = blocks_[index];
 
                 if (block.type != BlockType::Air)
-                    generateBlockMesh(block);
+                    generateBlockMesh(block, neighborChunks);
             }
         }
     }
+
+    meshDataBuffer_.shrink_to_fit();
 }
 
 void Chunk::generateTerrain()
@@ -146,7 +148,7 @@ void Chunk::generateTerrain()
                     type = BlockType::Stone;
                 }
 
-                // // Cave generation
+                // Cave generation
                 // float caveVal = terrainGen_.getCaveNoise(worldX, (float)y, worldZ);
                 // if (y < height - 5 &&
                 //     caveVal > Constants::CAVE_THRESHOLD &&
@@ -163,48 +165,49 @@ void Chunk::generateTerrain()
     }
 }
 
-ChunkState Chunk::getState() const
+void Chunk::generateBlockMesh(const Block &block, std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    return stateMachine_.getState();
-}
-
-void Chunk::setState(ChunkState newState)
-{
-    stateMachine_.setState(newState);
-}
-
-const ChunkCoord Chunk::getCoord() const
-{
-    return chunkCoord_;
-}
-
-const BoundingBox Chunk::getBoundingBox() const
-{
-    return boundingBox_;
-}
-
-void Chunk::generateBlockMesh(const Block &block)
-{
-
     if (block.type == BlockType::Air)
         return;
 
-    // render faces if face doesn't have anything in front of it
+    // Create a 3x3x3 cache of neighbor block types.
+    std::array<BlockType, 27> neighborTypesCache;
+    for (int i = 0; i < 27; i++)
+    {
+        glm::ivec3 offset = glm::ivec3(i % 3 - 1, (i / 3) % 3 - 1, i / 9 - 1);
+        neighborTypesCache[i] = getNeighborBlockType(block.position, offset, neighborChunks);
+    }
+
+    // Helper to get neighbor from cache
+    auto getNeighborTypeFromCache = [&](int x, int y, int z)
+    {
+        // Convert offset from [-1, 1] to [0, 2] for array indexing
+        return neighborTypesCache[(x + 1) + (y + 1) * 3 + (z + 1) * 9];
+    };
+
+    // Render faces if face doesn't have anything in front of it
     for (int faceIdx = 0; faceIdx < 6; faceIdx++)
     {
         const BlockFaces face = static_cast<BlockFaces>(faceIdx);
         const glm::ivec3 offset = FACE_OFFSETS[faceIdx];
 
-        BlockType neighborType = getNeighborBlockType(block.position, offset);
+        BlockType neighborType = getNeighborTypeFromCache(offset.x, offset.y, offset.z);
+        BlockType currType = getNeighborTypeFromCache(0, 0, 0);
 
         if (isTransparent(neighborType))
         {
-            addBlockFace(block, block.type, face);
+            addBlockFace(block, face, getNeighborTypeFromCache);
         }
     }
 }
 
-void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs)
+void Chunk::addBlockFace(const Block &block, const BlockFaces face, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
+{
+    const std::vector<glm::vec2> faceUVs = textureAtlas_->getFaceUVs(block.type, face);
+    generateFacevertices(block, face, faceUVs, getNeighborTypeFromCache);
+}
+
+void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
 {
     using Vec3 = glm::vec3;
     using Vec2 = glm::vec2;
@@ -294,92 +297,106 @@ void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std:
     const auto &aoData = aoOffsets.at(face);
 
     // ao helper function
-    auto computeAO = [](bool side1, bool side2, bool corner)
+    auto computeAO = [&](const std::array<glm::ivec3, 3> &offsets)
     {
+        bool side1 = !isTransparent(getNeighborTypeFromCache(offsets[0].x, offsets[0].y, offsets[0].z));
+        bool side2 = !isTransparent(getNeighborTypeFromCache(offsets[1].x, offsets[1].y, offsets[1].z));
+        bool corner = !isTransparent(getNeighborTypeFromCache(offsets[2].x, offsets[2].y, offsets[2].z));
+
         if (side1 && side2)
         {
-            return 0;
+            return 0.3f; // Darkest
         }
-        return 3 - (side1 + side2 + corner);
+        int occlusion = side1 + side2 + corner;
+        return 1.0f - occlusion * 0.2f; // Simple mapping: 1.0, 0.8, 0.6, 0.4
     };
 
-    std::vector<float> vertices;
-    vertices.reserve(6 * (3 + 2 + 1)); // 6 vertices, each with 3 position + 2 UV + AO
+    meshDataBuffer_.reserve(meshDataBuffer_.size() + 30); // Reserve for 6 vertices * 5 floats
 
     // loop through quad indicies
     for (size_t i = 0; i < 6; ++i)
     {
         const int cornerIdx = quadIndices[i];
-
-        // example corners for FRONT face: { Vec3(-0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f) }
-        //               current corner vector + block position
         const Vec3 &pos = corners[cornerIdx] + glm::vec3(block.position);
         const Vec2 &uv = faceUVs[i];
 
         // get the offsets for the corner
-        const AOTriplet &offsets = aoData[cornerIdx];
+        float ao = computeAO(aoData[cornerIdx]);
 
-        // get the ao using curr block position + ao offsets
-        // 0 = darkest, 3 = brightest
-        glm::ivec3 blockWorldCoords = chunkManager_->chunkToWorldCoords(chunkCoord_, block.position);
-
-        bool side1 = chunkManager_->isBlockSolid(blockWorldCoords + offsets[0]);
-        bool side2 = chunkManager_->isBlockSolid(blockWorldCoords + offsets[1]);
-        bool corner = chunkManager_->isBlockSolid(blockWorldCoords + offsets[2]);
-        int aoValue = computeAO(side1, side2, corner);
-
-        // get aoValue in range[0 - 1]
-        float ao;
-        switch (aoValue)
-        {
-        case 0:
-            ao = 0.3f;
-            break; // Darkest - both sides blocked
-        case 1:
-            ao = 0.5f;
-            break; // Dark - two neighbors blocked
-        case 2:
-            ao = 0.7f;
-            break; // Medium - one neighbor blocked
-        case 3:
-            ao = 1.0f;
-            break; // Bright - no neighbors blocked
-        default:
-            ao = 1.0f;
-            break;
-        }
-
-        vertices.insert(vertices.end(), {pos.x, pos.y, pos.z, uv.x, uv.y, ao});
+        meshDataBuffer_.push_back(pos.x);
+        meshDataBuffer_.push_back(pos.y);
+        meshDataBuffer_.push_back(pos.z);
+        meshDataBuffer_.push_back(uv.x);
+        meshDataBuffer_.push_back(uv.y);
+        meshDataBuffer_.push_back(ao);
     }
-
-    meshDataBuffer_.insert(meshDataBuffer_.end(), vertices.begin(), vertices.end());
-    // return vertices;
 }
 
-void Chunk::addBlockFace(const Block &block, const BlockType type, const BlockFaces face)
+BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset, std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    const std::vector<glm::vec2> faceUVs = textureAtlas_->getFaceUVs(type, face);
-    generateFacevertices(block, face, faceUVs);
-}
+    const auto northChunk = neighborChunks[0];
+    const auto southChunk = neighborChunks[1];
+    const auto eastChunk = neighborChunks[2];
+    const auto westChunk = neighborChunks[3];
 
-BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset)
-{
     const glm::ivec3 neighborLocalPos = blockPos + offset;
 
     // if it's in the chunk, just get it
     if (blockInChunkBounds(neighborLocalPos))
     {
-        return getBlockLocal(neighborLocalPos).type;
+        return blocks_[getBlockIndex(neighborLocalPos)].type;
     }
-    // get it using chunkManager_ coords
     else
     {
-        // get blocks chunkManager_ positoins
-        glm::ivec3 blockWorldPos = chunkManager_->chunkToWorldCoords(chunkCoord_, blockPos);
-        // get neighbors chunkManager_ pos using blocks position
-        glm::ivec3 neighborWorldPos = blockWorldPos + offset;
-        // get type of neighbor
-        return chunkManager_->getBlockGlobal(neighborWorldPos).type;
+        // Check which chunk block is in
+        // Determine which neighboring chunk the block falls into and get its local coordinates
+
+        if (neighborLocalPos.x < 0 &&
+            neighborLocalPos.z >= 0 && neighborLocalPos.z < Constants::CHUNK_SIZE_Z &&
+            neighborLocalPos.y >= 0 && neighborLocalPos.y < Constants::CHUNK_SIZE_Y)
+        {
+            if (westChunk)
+            {
+                glm::ivec3 localPosInNeighbor = {neighborLocalPos.x + Constants::CHUNK_SIZE_X, neighborLocalPos.y, neighborLocalPos.z};
+                return westChunk->blocks_[getBlockIndex(localPosInNeighbor)].type;
+            }
+        }
+        // Check East neighbor (+X direction)
+        else if (neighborLocalPos.x >= Constants::CHUNK_SIZE_X &&
+                 neighborLocalPos.z >= 0 && neighborLocalPos.z < Constants::CHUNK_SIZE_Z &&
+                 neighborLocalPos.y >= 0 && neighborLocalPos.y < Constants::CHUNK_SIZE_Y)
+        {
+            if (eastChunk)
+            {
+                glm::ivec3 localPosInNeighbor = {neighborLocalPos.x - Constants::CHUNK_SIZE_X, neighborLocalPos.y, neighborLocalPos.z};
+                return eastChunk->blocks_[getBlockIndex(localPosInNeighbor)].type;
+            }
+        }
+        // Check South neighbor (-Z direction)
+        else if (neighborLocalPos.z < 0 &&
+                 neighborLocalPos.x >= 0 && neighborLocalPos.x < Constants::CHUNK_SIZE_X &&
+                 neighborLocalPos.y >= 0 && neighborLocalPos.y < Constants::CHUNK_SIZE_Y)
+        {
+            if (southChunk)
+            {
+                glm::ivec3 localPosInNeighbor = {neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z + Constants::CHUNK_SIZE_Z};
+                return southChunk->blocks_[getBlockIndex(localPosInNeighbor)].type;
+            }
+        }
+        // Check North neighbor (+Z direction)
+        else if (neighborLocalPos.z >= Constants::CHUNK_SIZE_Z &&
+                 neighborLocalPos.x >= 0 && neighborLocalPos.x < Constants::CHUNK_SIZE_X &&
+                 neighborLocalPos.y >= 0 && neighborLocalPos.y < Constants::CHUNK_SIZE_Y)
+        {
+            if (northChunk)
+            {
+                glm::ivec3 localPosInNeighbor = {neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z - Constants::CHUNK_SIZE_Z};
+                return northChunk->blocks_[getBlockIndex(localPosInNeighbor)].type;
+            }
+        }
+
+        // Fallback
+        return BlockType::Air;
     }
 }
 
@@ -411,4 +428,38 @@ inline bool Chunk::blockInChunkBounds(const glm::ivec3 &pos) const
     return pos.x >= 0 && pos.x < Constants::CHUNK_SIZE_X &&
            pos.y >= 0 && pos.y < Constants::CHUNK_SIZE_Y &&
            pos.z >= 0 && pos.z < Constants::CHUNK_SIZE_Z;
+}
+
+ChunkState Chunk::getState() const
+{
+    return stateMachine_.getState();
+}
+
+void Chunk::setState(ChunkState newState)
+{
+    stateMachine_.setState(newState);
+}
+
+bool Chunk::canUnload() const
+{
+    return stateMachine_.canUnload();
+}
+
+bool Chunk::isProcessing()
+{
+    return stateMachine_.isProcessing();
+}
+
+bool Chunk::canRemesh()
+{
+    return stateMachine_.canRemesh();
+}
+const ChunkCoord Chunk::getCoord() const
+{
+    return chunkCoord_;
+}
+
+const BoundingBox Chunk::getBoundingBox() const
+{
+    return boundingBox_;
 }
