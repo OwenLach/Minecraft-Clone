@@ -17,6 +17,8 @@
 #include "FastNoiseLite.h"
 #include "TerrainGenerator.h"
 
+#include <functional>
+
 class ChunkManager;
 
 struct Vertex
@@ -35,19 +37,23 @@ class Chunk
 {
 
 public:
-    std::atomic<bool> isDirty_ = true;
+    std::atomic<bool> isDirty_ = false;
 
     Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, ChunkManager *chunkManager);
 
     void render();
-    void generateMesh();
+    void generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     void uploadMeshToGPU();
     void configureVertexAttributes();
     void setDirty();
     void generateTerrain();
 
+    // State
     ChunkState getState() const;
     void setState(ChunkState newState);
+    bool canUnload() const;
+    bool isProcessing();
+    bool canRemesh();
 
     const ChunkCoord getCoord() const;
     const BoundingBox getBoundingBox() const;
@@ -72,11 +78,11 @@ private:
     ChunkManager *chunkManager_;
     TerrainGenerator terrainGen_;
 
-    void generateBlockMesh(const Block &block);
-    void generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs);
-    void addBlockFace(const Block &block, const BlockType type, const BlockFaces face);
+    void generateBlockMesh(const Block &block, std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
+    void generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs, const std::function<BlockType(int, int, int)> &getCachedNeighbor);
+    void addBlockFace(const Block &block, const BlockFaces face, const std::function<BlockType(int, int, int)> &getCachedNeighbor);
 
-    BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset);
+    BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset, std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     inline bool blockInChunkBounds(const glm::ivec3 &pos) const;
     inline bool isTransparent(BlockType type) const;
     inline size_t getBlockIndex(const glm::ivec3 &pos) const;

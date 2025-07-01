@@ -3,8 +3,8 @@
 namespace Constants
 {
     // screen settings
-    constexpr unsigned int SCREEN_W = 1200;
-    constexpr unsigned int SCREEN_H = 800;
+    constexpr unsigned int SCREEN_W = 800;
+    constexpr unsigned int SCREEN_H = 600;
 
     // camera setttings
     constexpr float YAW = -90.0f;
@@ -28,5 +28,6 @@ namespace Constants
 
     // rendering settings
     constexpr int RENDER_DISTANCE = 10;
-    constexpr int MAX_CHUNKS_PER_FRAME = 16;
+    constexpr int MAX_CHUNKS_PER_FRAME = 10;
+
 }
