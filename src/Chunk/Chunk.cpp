@@ -1,7 +1,9 @@
 #include "Chunk/Chunk.h"
 #include "Chunk/ChunkManager.h"
+#include "Chunk/ChunkPipeline.h"
 #include "BlockTypes.h"
 #include "FastNoiseLite.h"
+#include "Performance/ScopedTimer.h"
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -23,8 +25,8 @@ static constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
     {0, 0, -1}  // Back
 }};
 
-Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, ChunkManager *chunkManager)
-    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), chunkManager_(chunkManager)
+Chunk::Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &chunkManager, ChunkPipeline &pipeline)
+    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), chunkManager_(chunkManager), pipeline_(pipeline)
 {
     const int chunkSize_X = Constants::CHUNK_SIZE_X;
     const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
@@ -35,6 +37,8 @@ Chunk::Chunk(Shader &shader, TextureAtlas *atlas, ChunkCoord pos, ChunkManager *
 
     boundingBox_.min = glm::vec3(chunkCoord_.x * chunkSize_X, -chunkSize_Y, chunkCoord_.z * chunkSize_Z);
     boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, 0, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
+
+    configureVertexAttributes();
 }
 
 void Chunk::render()
@@ -57,65 +61,10 @@ void Chunk::render()
     glDrawArrays(GL_TRIANGLES, 0, vertexCount_);
 }
 
-void Chunk::uploadMeshToGPU()
-{
-    if (meshDataBuffer_.empty())
-    {
-        vertexCount_ = 0;
-        isDirty_ = false;
-        return;
-    }
-
-    vbo_.setData(meshDataBuffer_.data(), meshDataBuffer_.size() * sizeof(float));
-    vertexCount_ = meshDataBuffer_.size() / 5; // five float per vertex
-
-    configureVertexAttributes();
-    meshDataBuffer_.clear();
-    isDirty_ = false;
-}
-
-void Chunk::configureVertexAttributes()
-{
-    vao_.bind();
-    VertexBufferLayout layout;
-    layout.push<float>(3); // position
-    layout.push<float>(2); // texture coords
-    layout.push<float>(1); // AO
-    vao_.addBuffer(vbo_, layout);
-}
-
-void Chunk::setDirty()
-{
-    isDirty_ = true;
-}
-
-void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
-{
-    const size_t estimatedFaces = (Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z) / 4;
-    meshDataBuffer_.clear();
-    meshDataBuffer_.reserve(estimatedFaces * 30); // 6 vertices * 5 floats per face
-
-    // loop through chunk and generate each blocks mesh
-    for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
-    {
-        for (int y = 0; y < Constants::CHUNK_SIZE_Y; y++)
-        {
-            for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
-            {
-                const size_t index = getBlockIndex(glm::ivec3(x, y, z));
-                const Block &block = blocks_[index];
-
-                if (block.type != BlockType::Air)
-                    generateBlockMesh(block, neighborChunks);
-            }
-        }
-    }
-
-    meshDataBuffer_.shrink_to_fit();
-}
-
 void Chunk::generateTerrain()
 {
+    // ScopedTimer timer("Chunk::generateTerrain");
+
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
     {
         for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
@@ -165,45 +114,120 @@ void Chunk::generateTerrain()
     }
 }
 
-void Chunk::generateBlockMesh(const Block &block, std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
+void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    if (block.type == BlockType::Air)
-        return;
+    ScopedTimer timer("Chunk::generateMesh");
 
+    const size_t maxFaces = Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z * 6;
+    meshDataBuffer_.clear();
+    meshDataBuffer_.reserve(maxFaces * 6 * 6); // 6 vertices × 6 floats per face
+
+    // loop through chunk and generate each blocks mesh
+    for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
+    {
+        for (int y = 0; y < Constants::CHUNK_SIZE_Y; y++)
+        {
+            for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
+            {
+                glm::ivec3 pos = glm::ivec3(x, y, z);
+                const size_t index = getBlockIndex(pos);
+                const Block &block = blocks_[index];
+
+                if (block.type == BlockType::Air)
+                    continue; // skip right away
+                if (isBlockHidden(pos))
+                    continue; // skip fully occluded blocks
+
+                generateBlockMesh(block, neighborChunks);
+            }
+        }
+    }
+
+    meshDataBuffer_.shrink_to_fit();
+}
+
+void Chunk::uploadMeshToGPU()
+{
+    if (meshDataBuffer_.empty())
+    {
+        vertexCount_ = 0;
+        isDirty_ = false;
+        return;
+    }
+
+    vbo_.setData(meshDataBuffer_.data(), meshDataBuffer_.size() * sizeof(float));
+    vertexCount_ = meshDataBuffer_.size() / 6; // five float per vertex
+
+    // configureVertexAttributes();
+    meshDataBuffer_.clear();
+    isDirty_ = false;
+}
+
+void Chunk::onNeighborReady()
+{
+    // Add one to the atmoic varibale and get current count
+    // + 1 because fetech_add(1) returns old value
+    int neighborsReady = neighborsReadyCount_.fetch_add(1) + 1;
+    // Generate mesh if all neighbors are laoded and terrain is ready
+    if (neighborsReady == 4 && getState() == ChunkState::TERRAIN_READY)
+    {
+        pipeline_.generateMesh(shared_from_this());
+    }
+}
+
+void Chunk::checkAndNotifyNeighbors()
+{
+    for (const auto &n : chunkManager_.getChunkNeighbors(chunkCoord_))
+    {
+        if (n)
+            n->onNeighborReady();
+    }
+}
+
+void Chunk::configureVertexAttributes()
+{
+    vao_.bind();
+    VertexBufferLayout layout;
+    layout.push<float>(3); // position
+    layout.push<float>(2); // texture coords
+    layout.push<float>(1); // AO
+    vao_.addBuffer(vbo_, layout);
+}
+
+void Chunk::setDirty()
+{
+    isDirty_ = true;
+}
+
+void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
+{
     // Create a 3x3x3 cache of neighbor block types.
-    std::array<BlockType, 27> neighborTypesCache;
+    BlockType cache[27];
     for (int i = 0; i < 27; i++)
     {
         glm::ivec3 offset = glm::ivec3(i % 3 - 1, (i / 3) % 3 - 1, i / 9 - 1);
-        neighborTypesCache[i] = getNeighborBlockType(block.position, offset, neighborChunks);
+        cache[i] = getNeighborBlockType(block.position, offset, neighborChunks);
     }
 
     // Helper to get neighbor from cache
     auto getNeighborTypeFromCache = [&](int x, int y, int z)
     {
         // Convert offset from [-1, 1] to [0, 2] for array indexing
-        return neighborTypesCache[(x + 1) + (y + 1) * 3 + (z + 1) * 9];
+        return cache[(x + 1) + (y + 1) * 3 + (z + 1) * 9];
     };
 
     // Render faces if face doesn't have anything in front of it
-    for (int faceIdx = 0; faceIdx < 6; faceIdx++)
+    for (int f = 0; f < 6; f++)
     {
-        const BlockFaces face = static_cast<BlockFaces>(faceIdx);
-        const glm::ivec3 offset = FACE_OFFSETS[faceIdx];
-
-        BlockType neighborType = getNeighborTypeFromCache(offset.x, offset.y, offset.z);
-        BlockType currType = getNeighborTypeFromCache(0, 0, 0);
-
-        if (isTransparent(neighborType))
-        {
-            addBlockFace(block, face, getNeighborTypeFromCache);
-        }
+        const auto offset = FACE_OFFSETS[f];
+        if (isTransparent(getNeighborTypeFromCache(offset.x, offset.y, offset.z)))
+            addBlockFace(block, static_cast<BlockFaces>(f), getNeighborTypeFromCache);
     }
 }
 
 void Chunk::addBlockFace(const Block &block, const BlockFaces face, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
 {
-    const std::vector<glm::vec2> faceUVs = textureAtlas_->getFaceUVs(block.type, face);
+    const std::vector<glm::vec2> faceUVs = textureAtlas_.getFaceUVs(block.type, face);
     generateFacevertices(block, face, faceUVs, getNeighborTypeFromCache);
 }
 
@@ -311,8 +335,6 @@ void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std:
         return 1.0f - occlusion * 0.2f; // Simple mapping: 1.0, 0.8, 0.6, 0.4
     };
 
-    meshDataBuffer_.reserve(meshDataBuffer_.size() + 30); // Reserve for 6 vertices * 5 floats
-
     // loop through quad indicies
     for (size_t i = 0; i < 6; ++i)
     {
@@ -418,6 +440,27 @@ inline bool Chunk::isTransparent(BlockType type) const
     return type == BlockType::Air;
 }
 
+bool Chunk::isBlockHidden(const glm::ivec3 &pos)
+{
+    // Quick check if all 6 neighbors are solid blocks
+    for (const auto &offset : FACE_OFFSETS)
+    {
+        glm::ivec3 neighborPos = pos + offset;
+        if (blockInChunkBounds(neighborPos))
+        {
+            if (isTransparent(blocks_[getBlockIndex(neighborPos)].type))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false; // Edge blocks are never completely hidden
+        }
+    }
+    return true;
+}
+
 inline size_t Chunk::getBlockIndex(const glm::ivec3 &pos) const
 {
     return pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y);
@@ -454,6 +497,7 @@ bool Chunk::canRemesh()
 {
     return stateMachine_.canRemesh();
 }
+
 const ChunkCoord Chunk::getCoord() const
 {
     return chunkCoord_;

@@ -5,6 +5,8 @@
 #include "BlockTypes.h"
 #include "Block.h"
 
+#include "Performance/Profiler.h"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -86,7 +88,7 @@ void Application::initComponents()
     textureAtlas_ = std::make_unique<TextureAtlas>();
     shader_ = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
     imguiManager_ = std::make_unique<ImGuiManager>(window_);
-    world_ = std::make_unique<World>(*camera_, *shader_, textureAtlas_.get());
+    world_ = std::make_unique<World>(*camera_, *shader_, *textureAtlas_);
     crosshair_ = std::make_unique<Crosshair>();
 }
 
@@ -104,6 +106,8 @@ void Application::mainLoop()
         processInput(dt);
         update(dt);
         render();
+
+        Profiler::get().renderStats();
 
         glfwSwapBuffers(window_);
         glfwPollEvents();

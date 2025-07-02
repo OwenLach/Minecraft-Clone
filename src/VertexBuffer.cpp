@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-VertexBuffer::VertexBuffer() : dataSet(false)
+VertexBuffer::VertexBuffer() : hasData_(false)
 {
     glGenBuffers(1, &ID);
 }
@@ -21,16 +21,12 @@ void VertexBuffer::setData(const float *data, int size)
 {
     glBindBuffer(GL_ARRAY_BUFFER, ID);
     glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-    dataSet = true;
+    hasData_ = true;
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void VertexBuffer::bind() const
 {
-    if (!dataSet)
-    {
-        throw std::runtime_error("Attempting to bind VertexBuffer with no data");
-    }
     glBindBuffer(GL_ARRAY_BUFFER, ID);
 }
 
