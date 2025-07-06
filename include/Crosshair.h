@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "Shader.h"
-#include "VertexArray.h"
-#include "VertexBuffer.h"
+#include "OpenGL/VertexArray.h"
+#include "OpenGL/VertexBuffer.h"
 
 class Crosshair
 {

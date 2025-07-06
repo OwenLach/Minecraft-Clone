@@ -1,6 +1,6 @@
 #include "Application.h"
 #include "Constants.h"
-#include "VertexArray.h"
+#include "OpenGL/VertexArray.h"
 #include "TextureAtlas.h"
 #include "BlockTypes.h"
 #include "Block.h"

@@ -4,6 +4,7 @@
 #include "BlockTypes.h"
 #include "FastNoiseLite.h"
 #include "Performance/ScopedTimer.h"
+#include "FaceData.h"
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -16,24 +17,17 @@
 #include <cmath>
 #include <functional>
 
-static constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
-    {1, 0, 0},  // Right
-    {-1, 0, 0}, // Left
-    {0, 1, 0},  // Top
-    {0, -1, 0}, // Bottom
-    {0, 0, 1},  // Front
-    {0, 0, -1}  // Back
-}};
-
 Chunk::Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &chunkManager, ChunkPipeline &pipeline)
-    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), chunkManager_(chunkManager), pipeline_(pipeline)
+    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), chunkManager_(chunkManager), pipeline_(pipeline), indexCount_(0), vertexCount_(0)
 {
     const int chunkSize_X = Constants::CHUNK_SIZE_X;
     const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
     const int chunkSize_Z = Constants::CHUNK_SIZE_Z;
-    // reserve for worse case
-    meshDataBuffer_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 36);
+
     blocks_.resize(chunkSize_X * chunkSize_Y * chunkSize_Z);
+
+    vertices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 4); // Max 4 unique vertices per face
+    indices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 6);  // Max 6 indices per face
 
     boundingBox_.min = glm::vec3(chunkCoord_.x * chunkSize_X, -chunkSize_Y, chunkCoord_.z * chunkSize_Z);
     boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, 0, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
@@ -44,21 +38,21 @@ Chunk::Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &
 void Chunk::render()
 {
     // make sure chunk is loaded
-    if (!stateMachine_.isReady())
-    {
+    if (!stateMachine_.isReady() || indexCount_ == 0)
         return;
-    }
 
     shader_.use();
+
     vao_.bind();
+    vbo_.bind();
+    ebo_.bind();
 
     glm::mat4 model = glm::mat4(1.0f);
-    modelMatrix_ = glm::translate(model, glm::vec3(chunkCoord_.x * Constants::CHUNK_SIZE_X,
-                                                   -Constants::CHUNK_SIZE_Y,
-                                                   chunkCoord_.z * Constants::CHUNK_SIZE_Z));
+    modelMatrix_ = glm::translate(model, glm::vec3(chunkCoord_.x * Constants::CHUNK_SIZE_X, -Constants::CHUNK_SIZE_Y, chunkCoord_.z * Constants::CHUNK_SIZE_Z));
 
     shader_.setMat4("model", modelMatrix_);
-    glDrawArrays(GL_TRIANGLES, 0, vertexCount_);
+
+    glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, 0);
 }
 
 void Chunk::generateTerrain()
@@ -116,11 +110,10 @@ void Chunk::generateTerrain()
 
 void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    ScopedTimer timer("Chunk::generateMesh");
+    // ScopedTimer timer("Chunk::generateMesh");
 
-    const size_t maxFaces = Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y * Constants::CHUNK_SIZE_Z * 6;
-    meshDataBuffer_.clear();
-    meshDataBuffer_.reserve(maxFaces * 6 * 6); // 6 vertices × 6 floats per face
+    vertices_.clear();
+    indices_.clear();
 
     // loop through chunk and generate each blocks mesh
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
@@ -134,32 +127,40 @@ void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
                 const Block &block = blocks_[index];
 
                 if (block.type == BlockType::Air)
-                    continue; // skip right away
+                    continue;
                 if (isBlockHidden(pos))
-                    continue; // skip fully occluded blocks
+                    continue;
 
                 generateBlockMesh(block, neighborChunks);
             }
         }
     }
 
-    meshDataBuffer_.shrink_to_fit();
+    vertices_.shrink_to_fit();
+    indices_.shrink_to_fit();
 }
 
 void Chunk::uploadMeshToGPU()
 {
-    if (meshDataBuffer_.empty())
+    if (vertices_.empty() || indices_.empty())
     {
         vertexCount_ = 0;
+        indexCount_ = 0;
         isDirty_ = false;
         return;
     }
 
-    vbo_.setData(meshDataBuffer_.data(), meshDataBuffer_.size() * sizeof(float));
-    vertexCount_ = meshDataBuffer_.size() / 6; // five float per vertex
+    vao_.bind();
 
-    // configureVertexAttributes();
-    meshDataBuffer_.clear();
+    vbo_.setData(reinterpret_cast<const float *>(vertices_.data()), vertices_.size() * sizeof(Vertex));
+    vertexCount_ = vertices_.size();
+
+    indexCount_ = indices_.size();
+    ebo_.setData(indices_.data(), indexCount_ * sizeof(unsigned int));
+
+    vertices_.clear();
+    indices_.clear();
+
     isDirty_ = false;
 }
 
@@ -187,6 +188,9 @@ void Chunk::checkAndNotifyNeighbors()
 void Chunk::configureVertexAttributes()
 {
     vao_.bind();
+    vbo_.bind();
+    ebo_.bind();
+
     VertexBufferLayout layout;
     layout.push<float>(3); // position
     layout.push<float>(2); // texture coords
@@ -201,7 +205,7 @@ void Chunk::setDirty()
 
 void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    // Create a 3x3x3 cache of neighbor block types.
+    // ================NEIGHBOR CACHING===================================
     BlockType cache[27];
     for (int i = 0; i < 27; i++)
     {
@@ -215,110 +219,21 @@ void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_p
         // Convert offset from [-1, 1] to [0, 2] for array indexing
         return cache[(x + 1) + (y + 1) * 3 + (z + 1) * 9];
     };
+    // ========================================================================
 
-    // Render faces if face doesn't have anything in front of it
     for (int f = 0; f < 6; f++)
     {
-        const auto offset = FACE_OFFSETS[f];
+        const auto offset = FaceData::FACE_OFFSETS[f];
         if (isTransparent(getNeighborTypeFromCache(offset.x, offset.y, offset.z)))
-            addBlockFace(block, static_cast<BlockFaces>(f), getNeighborTypeFromCache);
+            generateFaceVertices(block, static_cast<BlockFaces>(f), getNeighborTypeFromCache);
     }
 }
 
-void Chunk::addBlockFace(const Block &block, const BlockFaces face, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
+void Chunk::generateFaceVertices(const Block &block, BlockFaces face, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
 {
-    const std::vector<glm::vec2> faceUVs = textureAtlas_.getFaceUVs(block.type, face);
-    generateFacevertices(block, face, faceUVs, getNeighborTypeFromCache);
-}
-
-void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
-{
-    using Vec3 = glm::vec3;
-    using Vec2 = glm::vec2;
-    using IVec3 = glm::ivec3;
-    using AOTriplet = std::array<IVec3, 3>;
-
-    static const std::unordered_map<BlockFaces, std::array<Vec3, 4>> faceCorners = {
-        {BlockFaces::Front, {Vec3(-0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f)}},
-        {BlockFaces::Back, {Vec3(0.5f, -0.5f, -0.5f), Vec3(-0.5f, -0.5f, -0.5f), Vec3(-0.5f, 0.5f, -0.5f), Vec3(0.5f, 0.5f, -0.5f)}},
-        {BlockFaces::Left, {Vec3(-0.5f, -0.5f, -0.5f), Vec3(-0.5f, -0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, -0.5f)}},
-        {BlockFaces::Right, {Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, -0.5f), Vec3(0.5f, 0.5f, -0.5f), Vec3(0.5f, 0.5f, 0.5f)}},
-        {BlockFaces::Top, {Vec3(-0.5f, 0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(0.5f, 0.5f, -0.5f), Vec3(-0.5f, 0.5f, -0.5f)}},
-        {BlockFaces::Bottom, {Vec3(-0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(-0.5f, -0.5f, 0.5f)}},
-    };
-
-    static const std::unordered_map<BlockFaces, std::array<AOTriplet, 4>> aoOffsets = {
-        {BlockFaces::Front, {
-                                // Bottom-left vertex
-                                AOTriplet{IVec3(-1, 0, 1), IVec3(0, -1, 1), IVec3(-1, -1, 1)},
-                                // Bottom-right vertex
-                                AOTriplet{IVec3(1, 0, 1), IVec3(0, -1, 1), IVec3(1, -1, 1)},
-                                // Top-right vertex
-                                AOTriplet{IVec3(1, 0, 1), IVec3(0, 1, 1), IVec3(1, 1, 1)},
-                                // Top-left vertex
-                                AOTriplet{IVec3(-1, 0, 1), IVec3(0, 1, 1), IVec3(-1, 1, 1)},
-                            }},
-        {BlockFaces::Back, {
-                               // Bottom-left vertex (from back face perspective)
-                               AOTriplet{IVec3(1, 0, -1), IVec3(0, -1, -1), IVec3(1, -1, -1)},
-                               // Bottom-right vertex
-                               AOTriplet{IVec3(-1, 0, -1), IVec3(0, -1, -1), IVec3(-1, -1, -1)},
-                               // Top-right vertex
-                               AOTriplet{IVec3(-1, 0, -1), IVec3(0, 1, -1), IVec3(-1, 1, -1)},
-                               // Top-left vertex
-                               AOTriplet{IVec3(1, 0, -1), IVec3(0, 1, -1), IVec3(1, 1, -1)},
-                           }},
-        {BlockFaces::Left, {
-                               // Bottom-left vertex
-                               AOTriplet{IVec3(-1, 0, -1), IVec3(-1, -1, 0), IVec3(-1, -1, -1)},
-                               // Bottom-right vertex
-                               AOTriplet{IVec3(-1, 0, 1), IVec3(-1, -1, 0), IVec3(-1, -1, 1)},
-                               // Top-right vertex
-                               AOTriplet{IVec3(-1, 0, 1), IVec3(-1, 1, 0), IVec3(-1, 1, 1)},
-                               // Top-left vertex
-                               AOTriplet{IVec3(-1, 0, -1), IVec3(-1, 1, 0), IVec3(-1, 1, -1)},
-                           }},
-        {BlockFaces::Right, {
-                                // Bottom-left vertex
-                                AOTriplet{IVec3(1, 0, 1), IVec3(1, -1, 0), IVec3(1, -1, 1)},
-                                // Bottom-right vertex
-                                AOTriplet{IVec3(1, 0, -1), IVec3(1, -1, 0), IVec3(1, -1, -1)},
-                                // Top-right vertex
-                                AOTriplet{IVec3(1, 0, -1), IVec3(1, 1, 0), IVec3(1, 1, -1)},
-                                // Top-left vertex
-                                AOTriplet{IVec3(1, 0, 1), IVec3(1, 1, 0), IVec3(1, 1, 1)},
-                            }},
-        {BlockFaces::Top, {
-                              // Bottom-left vertex (front-left from top view)
-                              AOTriplet{IVec3(-1, 1, 0), IVec3(0, 1, 1), IVec3(-1, 1, 1)},
-                              // Bottom-right vertex (front-right from top view)
-                              AOTriplet{IVec3(1, 1, 0), IVec3(0, 1, 1), IVec3(1, 1, 1)},
-                              // Top-right vertex (back-right from top view)
-                              AOTriplet{IVec3(1, 1, 0), IVec3(0, 1, -1), IVec3(1, 1, -1)},
-                              // Top-left vertex (back-left from top view)
-                              AOTriplet{IVec3(-1, 1, 0), IVec3(0, 1, -1), IVec3(-1, 1, -1)},
-                          }},
-        {BlockFaces::Bottom, {
-                                 // Bottom-left vertex (back-left from bottom view)
-                                 AOTriplet{IVec3(-1, -1, 0), IVec3(0, -1, -1), IVec3(-1, -1, -1)},
-                                 // Bottom-right vertex (back-right from bottom view)
-                                 AOTriplet{IVec3(1, -1, 0), IVec3(0, -1, -1), IVec3(1, -1, -1)},
-                                 // Top-right vertex (front-right from bottom view)
-                                 AOTriplet{IVec3(1, -1, 0), IVec3(0, -1, 1), IVec3(1, -1, 1)},
-                                 // Top-left vertex (front-left from bottom view)
-                                 AOTriplet{IVec3(-1, -1, 0), IVec3(0, -1, 1), IVec3(-1, -1, 1)},
-                             }},
-    };
-
-    static const std::array<unsigned int, 6> quadIndices = {0, 1, 2, 2, 3, 0};
-
-    // Error if invalid UV count
-    if (faceUVs.size() != 6)
-        throw std::runtime_error("faceUVs must contain exactly 6 elements (6 vertices)");
-
-    // get corners and ao offsets for the face
-    const auto &corners = faceCorners.at(face);
-    const auto &aoData = aoOffsets.at(face);
+    const auto &faceUVs = textureAtlas_.getBlockFaceUVs(block.type, face);
+    const auto &corners = FaceData::faceCorners.at(face);
+    const auto &aoData = FaceData::aoOffsets.at(face);
 
     // ao helper function
     auto computeAO = [&](const std::array<glm::ivec3, 3> &offsets)
@@ -335,22 +250,20 @@ void Chunk::generateFacevertices(const Block &block, BlockFaces face, const std:
         return 1.0f - occlusion * 0.2f; // Simple mapping: 1.0, 0.8, 0.6, 0.4
     };
 
-    // loop through quad indicies
-    for (size_t i = 0; i < 6; ++i)
+    unsigned int baseVertexIndex = static_cast<unsigned int>(vertices_.size());
+    // Make vertex for each corner of face
+    for (int i = 0; i < 4; i++)
     {
-        const int cornerIdx = quadIndices[i];
-        const Vec3 &pos = corners[cornerIdx] + glm::vec3(block.position);
-        const Vec2 &uv = faceUVs[i];
+        Vertex v;
+        v.position = corners[i] + glm::vec3(block.position);
+        v.textureCoords = faceUVs[i];
+        v.ao = computeAO(aoData[i]);
+        vertices_.push_back(v);
+    }
 
-        // get the offsets for the corner
-        float ao = computeAO(aoData[cornerIdx]);
-
-        meshDataBuffer_.push_back(pos.x);
-        meshDataBuffer_.push_back(pos.y);
-        meshDataBuffer_.push_back(pos.z);
-        meshDataBuffer_.push_back(uv.x);
-        meshDataBuffer_.push_back(uv.y);
-        meshDataBuffer_.push_back(ao);
+    for (size_t i = 0; i < 6; i++)
+    {
+        indices_.push_back(baseVertexIndex + FaceData::quadIndices[i]);
     }
 }
 
@@ -443,7 +356,7 @@ inline bool Chunk::isTransparent(BlockType type) const
 bool Chunk::isBlockHidden(const glm::ivec3 &pos)
 {
     // Quick check if all 6 neighbors are solid blocks
-    for (const auto &offset : FACE_OFFSETS)
+    for (const auto &offset : FaceData::FACE_OFFSETS)
     {
         glm::ivec3 neighborPos = pos + offset;
         if (blockInChunkBounds(neighborPos))

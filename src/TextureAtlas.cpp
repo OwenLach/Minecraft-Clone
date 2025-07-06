@@ -1,4 +1,5 @@
 #include "TextureAtlas.h"
+#include "FaceData.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -33,53 +34,49 @@ TextureAtlas::TextureAtlas()
     }
     stbi_image_free(data);
 
-    initIndicies();
+    initBlockUVs();
 }
 
-std::vector<glm::vec2> TextureAtlas::getFaceUVs(BlockType type, BlockFaces face)
+void TextureAtlas::initBlockUVs()
 {
-    std::vector<glm::vec2> faceUVs;
+    std::unordered_map<BlockType, BlockTextureAtlasIndicies> blockIndicies;
+    //                                        top             side                bottom
+    blockIndicies[BlockType::Grass] = {glm::ivec2(0, 0), glm::ivec2(3, 0), glm::ivec2(2, 0)};
+    blockIndicies[BlockType::Stone] = {glm::ivec2(1, 0), glm::ivec2(1, 0), glm::ivec2(1, 0)};
+    blockIndicies[BlockType::Cobblestone] = {glm::ivec2(0, 1), glm::ivec2(0, 1), glm::ivec2(0, 1)};
+    blockIndicies[BlockType::Dirt] = {glm::ivec2(2, 0), glm::ivec2(2, 0), glm::ivec2(2, 0)};
+
+    for (const auto &[type, indices] : blockIndicies)
+    {
+        BlockUVs blockUVs;
+
+        blockUVs.top = getTileUVs(indices.top.x, indices.top.y);
+        blockUVs.side = getTileUVs(indices.side.x, indices.side.y);
+        blockUVs.bottom = getTileUVs(indices.bottom.x, indices.bottom.y);
+
+        blockUVsMap[type] = blockUVs;
+    }
+}
+
+const std::array<glm::vec2, 4> &TextureAtlas::getBlockFaceUVs(BlockType type, BlockFaces face)
+{
+    const auto &blockUVs = blockUVsMap.at(type);
 
     if (face == BlockFaces::Top)
     {
-        faceUVs = getTileUVs(blockIndicies[type].top.x, blockIndicies[type].top.y);
-    }
-    else if (face == BlockFaces::Left || face == BlockFaces::Right || face == BlockFaces::Front || face == BlockFaces::Back)
-    {
-        faceUVs = getTileUVs(blockIndicies[type].side.x, blockIndicies[type].side.y);
+        return blockUVs.top;
     }
     else if (face == BlockFaces::Bottom)
     {
-        faceUVs = getTileUVs(blockIndicies[type].bottom.x, blockIndicies[type].bottom.y);
+        return blockUVs.bottom;
     }
-
-    return faceUVs;
+    else
+    {
+        return blockUVs.side;
+    }
 }
 
-void TextureAtlas::initIndicies()
-{
-    blockIndicies[BlockType::Grass] = {glm::ivec2(0, 0),  // top
-                                       glm::ivec2(3, 0),  // side
-                                       glm::ivec2(2, 0)}; // bottom
-
-    blockIndicies[BlockType::Stone] = {glm::ivec2(1, 0),  // top
-                                       glm::ivec2(1, 0),  // side
-                                       glm::ivec2(1, 0)}; // bottom
-
-    blockIndicies[BlockType::Cobblestone] = {glm::ivec2(0, 1),  // top
-                                             glm::ivec2(0, 1),  // side
-                                             glm::ivec2(0, 1)}; // bottom
-
-    blockIndicies[BlockType::CryingObsidian] = {glm::ivec2(5, 2),  // top
-                                                glm::ivec2(5, 2),  // side
-                                                glm::ivec2(5, 2)}; // bottom
-
-    blockIndicies[BlockType::Dirt] = {glm::ivec2(2, 0),  // top
-                                      glm::ivec2(2, 0),  // side
-                                      glm::ivec2(2, 0)}; // bottom
-}
-
-std::vector<glm::vec2> TextureAtlas::getTileUVs(int tileX, int tileY)
+std::array<glm::vec2, 4> TextureAtlas::getTileUVs(int tileX, int tileY)
 {
     int numTilesX = atlasWidth / tileSize;  // 16
     int numTilesY = atlasHeight / tileSize; // 16
@@ -100,7 +97,9 @@ std::vector<glm::vec2> TextureAtlas::getTileUVs(int tileX, int tileY)
     glm::vec2 bottomLeft = uvOffset;
     glm::vec2 bottomRight = uvOffset + glm::vec2(tileUVsize.x, 0.0f);
 
-    return {
-        bottomLeft, bottomRight, topRight,
-        topRight, topLeft, bottomLeft};
+    return {bottomLeft, bottomRight, topRight, topLeft};
+
+    // return {
+    //     bottomLeft, bottomRight, topRight,
+    //     topRight, topLeft, bottomLeft};
 }
