@@ -11,16 +11,6 @@ enum BlockType
     Dirt
 };
 
-enum class BlockFaces
-{
-    Right,
-    Left,
-    Top,
-    Bottom,
-    Front,
-    Back
-};
-
 struct BlockTextureAtlasIndicies
 {
     glm::vec2 top;

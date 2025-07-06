@@ -4,13 +4,15 @@
 #include "Constants.h"
 #include "TextureAtlas.h"
 #include "Shader.h"
-#include "VertexArray.h"
-#include "VertexBuffer.h"
-#include "VertexBufferLayout.h"
 #include "Chunk/ChunkCoord.h"
 #include "Chunk/ChunkStateMachine.h"
+#include "Chunk/Vertex.h"
 #include "FastNoiseLite.h"
 #include "TerrainGenerator.h"
+#include "OpenGL/VertexArray.h"
+#include "OpenGL/VertexBuffer.h"
+#include "OpenGL/ElementBuffer.h"
+#include "OpenGL/VertexBufferLayout.h"
 
 #include <vector>
 #include <memory>
@@ -42,10 +44,7 @@ public:
     void generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     void uploadMeshToGPU();
 
-    // --- Reactive System ---
-    // Called when a neighbor's terrain becomes ready.
     void onNeighborReady();
-    // Checks neighbors after its own terrain is ready.
     void checkAndNotifyNeighbors();
 
     // State
@@ -65,7 +64,11 @@ public:
 private:
     // ---- Core Data ------
     std::vector<Block> blocks_;
-    std::vector<float> meshDataBuffer_;
+
+    std::vector<unsigned int> indices_;
+    std::vector<Vertex> vertices_;
+    size_t vertexCount_ = 0;
+    int indexCount_ = 0;
 
     ChunkStateMachine stateMachine_;
     ChunkCoord chunkCoord_;
@@ -75,7 +78,6 @@ private:
     std::atomic<int> neighborsReadyCount_{0};
 
     glm::mat4 modelMatrix_;
-    size_t vertexCount_ = 0;
 
     // ------ References
     Shader &shader_;
@@ -84,10 +86,10 @@ private:
     ChunkPipeline &pipeline_;
     VertexArray vao_;
     VertexBuffer vbo_;
+    ElementBuffer ebo_;
 
     void generateBlockMesh(const Block &block, const std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
-    void generateFacevertices(const Block &block, BlockFaces face, const std::vector<glm::vec2> &faceUVs, const std::function<BlockType(int, int, int)> &getCachedNeighbor);
-    void addBlockFace(const Block &block, const BlockFaces face, const std::function<BlockType(int, int, int)> &getCachedNeighbor);
+    void generateFaceVertices(const Block &block, BlockFaces face, const std::function<BlockType(int, int, int)> &getCachedNeighbor);
 
     BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset, std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     inline bool blockInChunkBounds(const glm::ivec3 &pos) const;

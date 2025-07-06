@@ -1,6 +1,8 @@
 #pragma once
 
 #include "BlockTypes.h"
+#include "FaceData.h"
+
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include <vector>
@@ -14,11 +16,11 @@ public:
     int tileSize;
 
     TextureAtlas();
-    std::vector<glm::vec2> getFaceUVs(BlockType type, BlockFaces face);
+    const std::array<glm::vec2, 4> &getBlockFaceUVs(BlockType type, BlockFaces face);
 
 private:
-    std::unordered_map<BlockType, BlockTextureAtlasIndicies> blockIndicies;
+    std::unordered_map<BlockType, BlockUVs> blockUVsMap;
 
-    void initIndicies();
-    std::vector<glm::vec2> getTileUVs(int tileX, int tileY);
+    void initBlockUVs();
+    std::array<glm::vec2, 4> getTileUVs(int tileX, int tileY);
 };

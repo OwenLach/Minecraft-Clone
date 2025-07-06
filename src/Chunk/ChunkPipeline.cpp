@@ -54,7 +54,6 @@ void ChunkPipeline::processGPUUploads()
     // Process uploads on main thread
     while (!chunksToUpload.empty())
     {
-        ScopedTimer timer("Uploading Queue to GPU");
         auto chunk = chunksToUpload.front();
         chunksToUpload.pop();
 

@@ -1,9 +1,9 @@
 #include "Camera.h"
 #include "Constants.h"
-#include "VertexArray.h"
-#include "VertexBuffer.h"
-#include "VertexBufferLayout.h"
 #include "Shader.h"
+#include "OpenGL/VertexArray.h"
+#include "OpenGL/VertexBuffer.h"
+#include "OpenGL/VertexBufferLayout.h"
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
