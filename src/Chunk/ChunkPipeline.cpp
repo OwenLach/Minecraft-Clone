@@ -11,7 +11,7 @@
 #include <iostream>
 
 ChunkPipeline::ChunkPipeline(ChunkManager &chunkManager)
-    : threadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() - 2 : 1),
+    : threadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() / 2 : 1),
       chunkManager_(chunkManager)
 {
 }
@@ -22,15 +22,51 @@ void ChunkPipeline::generateTerrain(std::shared_ptr<Chunk> chunk)
     threadPool_.enqueue([this, chunk]() { //
         chunk->generateTerrain();
         chunk->setState(ChunkState::TERRAIN_READY);
-        // chunk->checkAndNotifyNeighbors();
-        generateMesh(chunk);
+        chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
     });
+}
+
+void ChunkPipeline::queueInitialMesh(std::shared_ptr<Chunk> chunk)
+{
+    std::lock_guard<std::mutex> lock(meshMutex_);
+    initialMeshQueue_.push(chunk);
+}
+
+void ChunkPipeline::queueRemesh(std::shared_ptr<Chunk> chunk)
+{
+    std::lock_guard<std::mutex> lock(meshMutex_);
+    remeshQueue_.push(chunk);
+}
+
+void ChunkPipeline::processMeshes()
+{
+    std::lock_guard<std::mutex> lock(meshMutex_);
+    
+    const int max_meshes = Constants::MAX_MESHES_PER_FRAME;
+    int meshed = 0;
+
+    // 1. Prioritize Initial Meshes
+    while (meshed < max_meshes && !initialMeshQueue_.empty()) {
+        std::shared_ptr<Chunk> chunk = initialMeshQueue_.front();
+        initialMeshQueue_.pop();
+        generateMesh(chunk);
+        meshed++;
+    }
+   
+    // 2. Process Re-meshes if we have remaining capacity
+    while (meshed < max_meshes && !remeshQueue_.empty()) {
+        std::shared_ptr<Chunk> chunk = remeshQueue_.front();
+        remeshQueue_.pop();
+        generateMesh(chunk);
+        meshed++;
+    }
 }
 
 void ChunkPipeline::generateMesh(std::shared_ptr<Chunk> chunk)
 {
-    chunk->setState(ChunkState::MESH_GENERATING);
     threadPool_.enqueue([this, chunk]() { //
+        if (!chunk) return;
+
         chunk->generateMesh(chunkManager_.getChunkNeighbors(chunk->getCoord()));
         chunk->setState(ChunkState::MESH_READY);
         {
@@ -39,6 +75,7 @@ void ChunkPipeline::generateMesh(std::shared_ptr<Chunk> chunk)
         }
     });
 }
+
 
 void ChunkPipeline::processGPUUploads()
 {
@@ -68,5 +105,4 @@ void ChunkPipeline::uploadMeshToGPU(std::shared_ptr<Chunk> chunk)
 {
     chunk->setState(ChunkState::LOADED);
     chunk->uploadMeshToGPU();
-    chunk->isDirty_.store(false);
 }

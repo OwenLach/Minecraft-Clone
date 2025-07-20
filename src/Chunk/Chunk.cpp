@@ -146,7 +146,6 @@ void Chunk::uploadMeshToGPU()
     {
         vertexCount_ = 0;
         indexCount_ = 0;
-        isDirty_ = false;
         return;
     }
 
@@ -160,30 +159,8 @@ void Chunk::uploadMeshToGPU()
 
     vertices_.clear();
     indices_.clear();
-
-    isDirty_ = false;
 }
 
-void Chunk::onNeighborReady()
-{
-    // Add one to the atmoic varibale and get current count
-    // + 1 because fetech_add(1) returns old value
-    int neighborsReady = neighborsReadyCount_.fetch_add(1) + 1;
-    // Generate mesh if all neighbors are laoded and terrain is ready
-    if (neighborsReady == 4 && getState() == ChunkState::TERRAIN_READY)
-    {
-        pipeline_.generateMesh(shared_from_this());
-    }
-}
-
-void Chunk::checkAndNotifyNeighbors()
-{
-    for (const auto &n : chunkManager_.getChunkNeighbors(chunkCoord_))
-    {
-        if (n)
-            n->onNeighborReady();
-    }
-}
 
 void Chunk::configureVertexAttributes()
 {
@@ -198,10 +175,7 @@ void Chunk::configureVertexAttributes()
     vao_.addBuffer(vbo_, layout);
 }
 
-void Chunk::setDirty()
-{
-    isDirty_ = true;
-}
+
 
 void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {

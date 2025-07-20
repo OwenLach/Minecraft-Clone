@@ -37,7 +37,8 @@ bool ChunkStateMachine::canTransitionTo(ChunkState newState) const
 
     case ChunkState::NEEDS_MESH_REGEN:
         return newState == ChunkState::MESH_GENERATING ||
-               newState == ChunkState::UNLOADING;
+               newState == ChunkState::UNLOADING || 
+               newState == ChunkState::TERRAIN_READY;
     }
 
     return false;
@@ -80,7 +81,7 @@ bool ChunkStateMachine::canUnload() const
 bool ChunkStateMachine::canRemesh() const
 {
     ChunkState state = currentState_.load();
-    return (state == ChunkState::LOADED || state == ChunkState::MESH_READY || state == ChunkState::NEEDS_MESH_REGEN) && !isProcessing();
+    return (state == ChunkState::LOADED || state == ChunkState::MESH_READY) && !isProcessing();
 }
 const char *ChunkStateMachine::toString(ChunkState state)
 {

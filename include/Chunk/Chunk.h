@@ -34,7 +34,6 @@ class Chunk : public std::enable_shared_from_this<Chunk>
 {
 
 public:
-    std::atomic<bool> isDirty_ = false;
 
     Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &chunkManager, ChunkPipeline &pipeline);
 
@@ -44,11 +43,7 @@ public:
     void generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     void uploadMeshToGPU();
 
-    void onNeighborReady();
-    void checkAndNotifyNeighbors();
-
     // State
-    void setDirty();
     ChunkState getState() const;
     void setState(ChunkState newState);
     bool canUnload() const;
@@ -74,8 +69,6 @@ private:
     ChunkCoord chunkCoord_;
     BoundingBox boundingBox_;
     TerrainGenerator terrainGen_;
-
-    std::atomic<int> neighborsReadyCount_{0};
 
     glm::mat4 modelMatrix_;
 

@@ -9,12 +9,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O0 -g")  # Turn off Release optimizations
 add_library(glad libs/glad/glad.c)
 target_include_directories(glad PUBLIC libs/glad/include)
 
-# GLFW (statically linked)
-add_library(glfw STATIC IMPORTED)
-set_target_properties(glfw PROPERTIES
-    IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/libs/glfw/lib-mingw-w64/libglfw3.a"
-    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/libs/glfw/include"
-)
+find_package(glfw3 REQUIRED)
 
 # ImGui
 file(GLOB IMGUI_SOURCES
@@ -28,6 +23,9 @@ target_include_directories(imgui PUBLIC
     libs/imgui/backends
     "${CMAKE_SOURCE_DIR}/libs/glfw/include" 
 )
+
+#Link imgui with GLFW
+target_link_libraries(imgui PUBLIC glfw)
 
 # Executable
 file(GLOB_RECURSE SOURCES "src/*.cpp")
