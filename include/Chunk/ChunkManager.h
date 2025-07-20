@@ -33,11 +33,14 @@ public:
     void addChunk(const ChunkCoord &coord, std::shared_ptr<Chunk> chunk);
     void removeChunk(const ChunkCoord &coord);
 
-    const auto &getLoadedChunks() const { return loadedChunks_; }
+    std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> getLoadedChunksCopy() const; 
     const std::shared_ptr<Chunk> getChunk(const ChunkCoord &coord) const;
     std::array<std::shared_ptr<Chunk>, 4> getChunkNeighbors(const ChunkCoord &coord);
 
     void render();
+
+    void markNeighborsForMeshRegeneration(const ChunkCoord &coord);
+    bool allNeighborsTerrainReady(const ChunkCoord &coord);
 
 private:
     std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks_;

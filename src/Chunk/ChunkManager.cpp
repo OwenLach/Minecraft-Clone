@@ -10,25 +10,31 @@
 #include <algorithm>
 #include <iostream>
 
+
 ChunkManager::ChunkManager(Shader &shader, Camera &camera, TextureAtlas &textureAtlas)
     : shader_(shader),
       camera_(camera),
       textureAtlas_(textureAtlas),
       pipeline_(std::make_unique<ChunkPipeline>(*this))
 {
-    // loadInitialChunks();
 }
 
 void ChunkManager::addChunk(const ChunkCoord &coord, std::shared_ptr<Chunk> chunk)
 {
-    std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
-    loadedChunks_[coord] = chunk;
+        std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
+        loadedChunks_[coord] = chunk;
 }
 
 void ChunkManager::removeChunk(const ChunkCoord &coord)
 {
     std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
     loadedChunks_.erase(coord);
+}
+
+std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>>  ChunkManager::getLoadedChunksCopy() const
+{
+    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+    return loadedChunks_;
 }
 
 const std::shared_ptr<Chunk> ChunkManager::getChunk(const ChunkCoord &coord) const
@@ -79,4 +85,35 @@ void ChunkManager::render()
         if (camera_.isAABBInFrustum(chunk->getBoundingBox()) && chunk->getState() == ChunkState::LOADED)
             chunk->render();
     }
+}
+
+void ChunkManager::markNeighborsForMeshRegeneration(const ChunkCoord &coord)
+{
+    auto originalChunk = getChunk(coord);
+    if (!originalChunk || originalChunk->getState() < ChunkState::TERRAIN_READY) {
+        return; // Don't mark neighbors if this chunk isn't ready
+    }
+
+    for (const auto &n_chunkPtr : getChunkNeighbors(coord))
+    {
+        if (!n_chunkPtr) continue;
+        
+        // The neighboring chunk exists, all its neighbors at least have their terrain ready, and the chunk can remesh
+        if (n_chunkPtr && allNeighborsTerrainReady(n_chunkPtr->getCoord()) && n_chunkPtr->canRemesh())
+                n_chunkPtr->setState(ChunkState::NEEDS_MESH_REGEN);
+    }
+}
+
+bool ChunkManager::allNeighborsTerrainReady(const ChunkCoord &coord)
+{
+    auto neighbors = getChunkNeighbors(coord);
+
+    for (auto &n_chunkPtr : neighbors)
+    {
+        if (!n_chunkPtr || n_chunkPtr->getState() < ChunkState::TERRAIN_READY)
+        {
+            return false;
+        }
+    }
+    return true;
 }

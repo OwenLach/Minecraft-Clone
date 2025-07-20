@@ -32,6 +32,8 @@ void World::update()
         lastPlayerChunk_ = currChunk;
     }
 
+    updateChunkStates();
+    pipeline_.processMeshes();
     pipeline_.processGPUUploads();
 }
 
@@ -79,7 +81,7 @@ void World::unloadDistantChunks()
     const ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera_.Position));
     std::vector<ChunkCoord> chunkCoordsToRemove;
 
-    for (const auto &[pos, chunk] : chunkManager_.getLoadedChunks())
+    for (const auto &[pos, chunk] : chunkManager_.getLoadedChunksCopy())
     {
         // if chunk is in the middle of processing anything, don't unload
         if (!isInRenderDistance(pos.x, pos.z, playerPos.x, playerPos.z) && chunk->canUnload())
@@ -91,6 +93,26 @@ void World::unloadDistantChunks()
     for (const auto &coord : chunkCoordsToRemove)
     {
         chunkManager_.removeChunk(coord);
+    }
+}
+
+void World::updateChunkStates() 
+{
+    for (const auto &[pos, chunk] : chunkManager_.getLoadedChunksCopy())
+    {
+        if (!chunk) continue;
+
+        ChunkState state = chunk->getState();
+
+        if (state == ChunkState::TERRAIN_READY && chunkManager_.allNeighborsTerrainReady(pos)) {   
+            // IMPORTANT: Set state immediately to prevent re-queueing
+            chunk->setState(ChunkState::MESH_GENERATING); 
+            pipeline_.queueInitialMesh(chunk);
+        }
+        else if (state == ChunkState::NEEDS_MESH_REGEN && chunkManager_.allNeighborsTerrainReady(pos)) {
+            chunk->setState(ChunkState::MESH_GENERATING);
+            pipeline_.queueRemesh(chunk);
+        }
     }
 }
 
@@ -151,42 +173,3 @@ bool World::isBlockSolid(glm::ivec3 blockWorldPos) const
     Block block = getBlockGlobal(glm::vec3(blockWorldPos));
     return block.type != BlockType::Air;
 }
-
-// void ChunkManager::markNeighborChunksForMeshRegeneration(const ChunkCoord &coord)
-// {
-//     // Return if the nei
-//     if (!allNeighborsLoaded(coord))
-//     {
-//         return;
-//     }
-
-//     auto neighbors = getChunkNeighbors(coord);
-//     for (const auto &n_chunkPtr : neighbors)
-//     {
-//         // The neighboring chunk exists and all its neighbors at least have their terrain ready && and the chunk can reme
-//         if (n_chunkPtr && allNeighborsLoaded(n_chunkPtr->getCoord()) && n_chunkPtr->canRemesh())
-//         {
-//             // Mesh regeneration
-//             bool expected = false;
-//             if (n_chunkPtr->isDirty_.compare_exchange_strong(expected, true))
-//             {
-//                 n_chunkPtr->setState(ChunkState::NEEDS_MESH_REGEN);
-//                 pipeline_->enqueueForRegen(n_chunkPtr);
-//             }
-//         }
-//     }
-// }
-
-// bool ChunkManager::allNeighborsLoaded(const ChunkCoord &coord)
-// {
-//     auto neighbors = getChunkNeighbors(coord);
-
-//     for (auto &n_chunkPtr : neighbors)
-//     {
-//         if (!n_chunkPtr || n_chunkPtr->getState() < ChunkState::TERRAIN_READY)
-//         {
-//             return false;
-//         }
-//     }
-//     return true;
-// }

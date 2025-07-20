@@ -23,6 +23,7 @@ public:
 private:
     void loadNewChunks(ChunkCoord center);
     void unloadDistantChunks();
+    void updateChunkStates();
 
     Camera &camera_;
     Shader &shader_;
@@ -40,9 +41,6 @@ private:
     Block getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos);
     Block getBlockGlobal(glm::vec3 worldPos) const;
     bool isBlockSolid(glm::ivec3 blockWorldPos) const;
-
-    // void markNeighborChunksForMeshRegeneration(const ChunkCoord &coord);
-    // bool allNeighborsLoaded(const ChunkCoord &coord);
 
     static inline bool
     isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
