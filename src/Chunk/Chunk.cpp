@@ -29,8 +29,8 @@ Chunk::Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &
     vertices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 4); // Max 4 unique vertices per face
     indices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 6);  // Max 6 indices per face
 
-    boundingBox_.min = glm::vec3(chunkCoord_.x * chunkSize_X, -chunkSize_Y, chunkCoord_.z * chunkSize_Z);
-    boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, 0, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
+    boundingBox_.min = glm::vec3(chunkCoord_.x * chunkSize_X, 0, chunkCoord_.z * chunkSize_Z);
+    boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, chunkSize_Y, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
 
     configureVertexAttributes();
 }
@@ -48,7 +48,7 @@ void Chunk::render()
     ebo_.bind();
 
     glm::mat4 model = glm::mat4(1.0f);
-    modelMatrix_ = glm::translate(model, glm::vec3(chunkCoord_.x * Constants::CHUNK_SIZE_X, -Constants::CHUNK_SIZE_Y, chunkCoord_.z * Constants::CHUNK_SIZE_Z));
+    modelMatrix_ = glm::translate(model, glm::vec3(chunkCoord_.x * Constants::CHUNK_SIZE_X, 0, chunkCoord_.z * Constants::CHUNK_SIZE_Z));
 
     shader_.setMat4("model", modelMatrix_);
 
@@ -161,6 +161,11 @@ void Chunk::uploadMeshToGPU()
     indices_.clear();
 }
 
+void Chunk::removeBlockAt(glm::ivec3 pos)
+{
+    const size_t index = getBlockIndex(pos);
+    blocks_[index] = Block(BlockType::Air, pos);
+}
 
 void Chunk::configureVertexAttributes()
 {
@@ -174,8 +179,6 @@ void Chunk::configureVertexAttributes()
     layout.push<float>(1); // AO
     vao_.addBuffer(vbo_, layout);
 }
-
-
 
 void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {

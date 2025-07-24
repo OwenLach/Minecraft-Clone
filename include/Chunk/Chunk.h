@@ -34,7 +34,6 @@ class Chunk : public std::enable_shared_from_this<Chunk>
 {
 
 public:
-
     Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &chunkManager, ChunkPipeline &pipeline);
 
     // --- Core Methods ---
@@ -42,6 +41,7 @@ public:
     void generateTerrain();
     void generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     void uploadMeshToGPU();
+    void removeBlockAt(glm::ivec3 pos);
 
     // State
     ChunkState getState() const;
