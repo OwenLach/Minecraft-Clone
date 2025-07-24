@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BlockTypes.h"
+#include "Block/BlockTypes.h"
 
 #include <array>
 #include <unordered_map>
@@ -24,15 +24,14 @@ struct BlockUVs
     std::array<glm::vec2, 4> bottom;
 };
 
-class FaceData
+namespace BlockFaceData
 {
-public:
     using Vec3 = glm::vec3;
     using Vec2 = glm::vec2;
     using IVec3 = glm::ivec3;
     using AOTriplet = std::array<IVec3, 3>;
 
-    static inline const std::unordered_map<BlockFaces, std::array<Vec3, 4>> faceCorners = {
+    inline const std::unordered_map<BlockFaces, std::array<Vec3, 4>> faceCorners = {
         {BlockFaces::Front, {Vec3(-0.5f, -0.5f, 0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f)}},
         {BlockFaces::Back, {Vec3(0.5f, -0.5f, -0.5f), Vec3(-0.5f, -0.5f, -0.5f), Vec3(-0.5f, 0.5f, -0.5f), Vec3(0.5f, 0.5f, -0.5f)}},
         {BlockFaces::Left, {Vec3(-0.5f, -0.5f, -0.5f), Vec3(-0.5f, -0.5f, 0.5f), Vec3(-0.5f, 0.5f, 0.5f), Vec3(-0.5f, 0.5f, -0.5f)}},
@@ -41,7 +40,7 @@ public:
         {BlockFaces::Bottom, {Vec3(-0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, -0.5f), Vec3(0.5f, -0.5f, 0.5f), Vec3(-0.5f, -0.5f, 0.5f)}},
     };
 
-    static inline const std::unordered_map<BlockFaces, std::array<AOTriplet, 4>> aoOffsets = {
+    inline const std::unordered_map<BlockFaces, std::array<AOTriplet, 4>> aoOffsets = {
         {BlockFaces::Front, {
                                 AOTriplet{IVec3(-1, 0, 1), IVec3(0, -1, 1), IVec3(-1, -1, 1)}, // Bottom-left vertex
                                 AOTriplet{IVec3(1, 0, 1), IVec3(0, -1, 1), IVec3(1, -1, 1)},   // Bottom-right vertex
@@ -80,9 +79,9 @@ public:
                              }},
     };
 
-    static inline const std::array<unsigned int, 6> quadIndices = {0, 1, 2, 2, 3, 0};
+    inline const std::array<unsigned int, 6> quadIndices = {0, 1, 2, 2, 3, 0};
 
-    static inline constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
+    inline constexpr std::array<glm::ivec3, 6> FACE_OFFSETS = {{
         {1, 0, 0},  // Right
         {-1, 0, 0}, // Left
         {0, 1, 0},  // Top

@@ -2,7 +2,7 @@
 #include "Chunk/ChunkManager.h"
 #include "Chunk/ChunkPipeline.h"
 #include "Chunk/ChunkCoord.h"
-#include "Block.h"
+#include "Block/Block.h"
 #include "Constants.h"
 #include "Camera.h"
 #include "Shader.h"

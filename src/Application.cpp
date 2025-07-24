@@ -2,8 +2,8 @@
 #include "Constants.h"
 #include "OpenGL/VertexArray.h"
 #include "TextureAtlas.h"
-#include "BlockTypes.h"
-#include "Block.h"
+#include "Block/BlockTypes.h"
+#include "Block/Block.h"
 
 #include "Performance/Profiler.h"
 

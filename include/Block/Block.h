@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BlockTypes.h"
+#include "Block/BlockTypes.h"
 
 class Block
 {

@@ -1,10 +1,10 @@
 #include "Chunk/Chunk.h"
 #include "Chunk/ChunkManager.h"
 #include "Chunk/ChunkPipeline.h"
-#include "BlockTypes.h"
+#include "Block/BlockTypes.h"
 #include "FastNoiseLite.h"
 #include "Performance/ScopedTimer.h"
-#include "FaceData.h"
+#include "Block/BlockFaceData.h"
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -200,7 +200,7 @@ void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_p
 
     for (int f = 0; f < 6; f++)
     {
-        const auto offset = FaceData::FACE_OFFSETS[f];
+        const auto offset = BlockFaceData::FACE_OFFSETS[f];
         if (isTransparent(getNeighborTypeFromCache(offset.x, offset.y, offset.z)))
             generateFaceVertices(block, static_cast<BlockFaces>(f), getNeighborTypeFromCache);
     }
@@ -209,8 +209,8 @@ void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_p
 void Chunk::generateFaceVertices(const Block &block, BlockFaces face, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
 {
     const auto &faceUVs = textureAtlas_.getBlockFaceUVs(block.type, face);
-    const auto &corners = FaceData::faceCorners.at(face);
-    const auto &aoData = FaceData::aoOffsets.at(face);
+    const auto &corners = BlockFaceData::faceCorners.at(face);
+    const auto &aoData = BlockFaceData::aoOffsets.at(face);
 
     // ao helper function
     auto computeAO = [&](const std::array<glm::ivec3, 3> &offsets)
@@ -240,7 +240,7 @@ void Chunk::generateFaceVertices(const Block &block, BlockFaces face, const std:
 
     for (size_t i = 0; i < 6; i++)
     {
-        indices_.push_back(baseVertexIndex + FaceData::quadIndices[i]);
+        indices_.push_back(baseVertexIndex + BlockFaceData::quadIndices[i]);
     }
 }
 
@@ -333,7 +333,7 @@ inline bool Chunk::isTransparent(BlockType type) const
 bool Chunk::isBlockHidden(const glm::ivec3 &pos)
 {
     // Quick check if all 6 neighbors are solid blocks
-    for (const auto &offset : FaceData::FACE_OFFSETS)
+    for (const auto &offset : BlockFaceData::FACE_OFFSETS)
     {
         glm::ivec3 neighborPos = pos + offset;
         if (blockInChunkBounds(neighborPos))
