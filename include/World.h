@@ -4,6 +4,7 @@
 #include "Chunk/ChunkPipeline.h"
 #include "Raycaster.h"
 #include "Constants.h"
+#include "Block/BlockOutline.h"
 
 #include <glm/glm.hpp>
 
@@ -35,10 +36,14 @@ private:
     ChunkPipeline pipeline_;
     ChunkCoord lastPlayerChunk_;
     Raycaster raycaster;
+    BlockOutline blockOutline_;
+    glm::ivec3 targetBlockPos_;
+    bool hasTargetBlock_ = false;
 
     void loadNewChunks(ChunkCoord center);
     void unloadDistantChunks();
     void updateChunkStates();
+    void updateBlockOutline();
 
     // Coordinate conversions
     glm::ivec3 chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
