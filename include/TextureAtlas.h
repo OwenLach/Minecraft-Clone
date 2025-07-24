@@ -1,7 +1,7 @@
 #pragma once
 
-#include "BlockTypes.h"
-#include "FaceData.h"
+#include "Block/BlockTypes.h"
+#include "Block/BlockFaceData.h"
 
 #include <glm/glm.hpp>
 #include <unordered_map>

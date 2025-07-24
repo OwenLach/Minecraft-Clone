@@ -1,4 +1,4 @@
-#include "Block.h"
+#include "Block/Block.h"
 
 Block::Block() : type(BlockType::Air), position(glm::ivec3(0.0f)) {}
 
