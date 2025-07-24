@@ -33,6 +33,7 @@ void World::update()
         lastPlayerChunk_ = currChunk;
     }
 
+    updateBlockOutline();
     updateChunkStates();
     pipeline_.processMeshes();
     pipeline_.processGPUUploads();
@@ -41,6 +42,11 @@ void World::update()
 void World::render()
 {
     chunkManager_.render();
+
+    if (hasTargetBlock_)
+    {
+        blockOutline_.render(camera_.getViewMatrix(), camera_.getProjectionMatrix(), targetBlockPos_);
+    }
 }
 
 void World::breakBlock()
@@ -141,6 +147,31 @@ void World::updateChunkStates()
             chunk->setState(ChunkState::MESH_GENERATING);
             pipeline_.queueRemesh(chunk);
         }
+    }
+}
+
+void World::updateBlockOutline()
+{
+    if (raycaster.cast())
+    {
+        // Global hit position
+        auto blockHitPos = raycaster.getHitBlockPosition();
+        Block block = getBlockGlobal(blockHitPos);
+        // std::cout << "Block Hit for outline" << std::endl;
+
+        if (block.type != BlockType::Air)
+        {
+
+            targetBlockPos_ = blockHitPos;
+            // std::cout << "setting hasTargetBlock_ to true" << std::endl;
+            hasTargetBlock_ = true;
+        }
+    }
+    // Only set it false if its true
+    else if (hasTargetBlock_)
+    {
+        // std::cout << "setting hasTargetBlock_ to false" << std::endl;
+        hasTargetBlock_ = false;
     }
 }
 
