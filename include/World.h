@@ -2,6 +2,7 @@
 
 #include "Chunk/ChunkManager.h"
 #include "Chunk/ChunkPipeline.h"
+#include "Raycaster.h"
 #include "Constants.h"
 
 #include <glm/glm.hpp>
@@ -20,11 +21,12 @@ public:
     void update();
     void render();
 
-private:
-    void loadNewChunks(ChunkCoord center);
-    void unloadDistantChunks();
-    void updateChunkStates();
+    void breakBlock();
+    void placeBlock();
 
+    bool isBlockSolid(glm::ivec3 blockWorldPos) const;
+
+private:
     Camera &camera_;
     Shader &shader_;
     TextureAtlas &textureAtlas_;
@@ -32,18 +34,22 @@ private:
     ChunkManager chunkManager_;
     ChunkPipeline pipeline_;
     ChunkCoord lastPlayerChunk_;
+    Raycaster raycaster;
+
+    void loadNewChunks(ChunkCoord center);
+    void unloadDistantChunks();
+    void updateChunkStates();
 
     // Coordinate conversions
     glm::ivec3 chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
     ChunkCoord worldToChunkCoords(glm::ivec3 worldCoords) const;
 
-    // Block helpers
-    Block getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos);
+    // Block helper
     Block getBlockGlobal(glm::vec3 worldPos) const;
-    bool isBlockSolid(glm::ivec3 blockWorldPos) const;
+    Block getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos);
+    glm::ivec3 getBlockLocalPosition(glm::ivec3 worldPos) const;
 
-    static inline bool
-    isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
+    static inline bool isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
     {
         const int renderDistance = Constants::RENDER_DISTANCE;
         const int dx = chunkX - playerX;

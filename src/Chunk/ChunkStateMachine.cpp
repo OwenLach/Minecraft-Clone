@@ -37,7 +37,7 @@ bool ChunkStateMachine::canTransitionTo(ChunkState newState) const
 
     case ChunkState::NEEDS_MESH_REGEN:
         return newState == ChunkState::MESH_GENERATING ||
-               newState == ChunkState::UNLOADING || 
+               newState == ChunkState::UNLOADING ||
                newState == ChunkState::TERRAIN_READY;
     }
 

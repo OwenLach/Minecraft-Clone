@@ -10,7 +10,7 @@ namespace Constants
     constexpr float YAW = -90.0f;
     constexpr float PITCH = 0.0f;
     constexpr float ZOOM = 80.0f;
-    constexpr float PLAYER_SPEED = 40.0f;
+    constexpr float PLAYER_SPEED = 30.0f;
     constexpr float MOUSE_SENSITIVITY = 0.05f;
     constexpr float ZOOM_SENSITIVITY = 5.0f;
 
@@ -30,5 +30,8 @@ namespace Constants
     constexpr int RENDER_DISTANCE = 10;
     constexpr int MAX_CHUNKS_PER_FRAME = 10;
     constexpr int MAX_MESHES_PER_FRAME = 4;
+
+    // Raycast
+    constexpr int MAX_RAYCAST_DIST = 10;
 
 }

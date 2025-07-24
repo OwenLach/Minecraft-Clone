@@ -42,7 +42,6 @@ private:
     void render();
     void update(const float dt);
 
-    void setupInputCallbacks();
     void setGLRenderState();
     float getDeltaTime();
     void processInput(float dt);

@@ -82,13 +82,12 @@ void Application::initOpenGL()
 
 void Application::initComponents()
 {
-    camera_ = std::make_unique<Camera>(glm::vec3(0.0f, -100.0f, 0.0f));
-    inputManager_ = std::make_unique<InputManager>(camera_.get());
-    setupInputCallbacks();
-    textureAtlas_ = std::make_unique<TextureAtlas>();
-    shader_ = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
     imguiManager_ = std::make_unique<ImGuiManager>(window_);
+    camera_ = std::make_unique<Camera>(glm::vec3(0.0f, 150.0f, 0.0f));
+    shader_ = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
+    textureAtlas_ = std::make_unique<TextureAtlas>();
     world_ = std::make_unique<World>(*camera_, *shader_, *textureAtlas_);
+    inputManager_ = std::make_unique<InputManager>(*camera_, window_, *world_);
     crosshair_ = std::make_unique<Crosshair>();
 }
 
@@ -154,17 +153,6 @@ void Application::setGLRenderState()
     glFrontFace(GL_CCW);
 }
 
-void Application::setupInputCallbacks()
-{
-    // set camera to the window
-    glfwSetWindowUserPointer(window_, inputManager_.get());
-    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    glfwSetFramebufferSizeCallback(window_, InputManager::framebuffer_size_callback);
-    glfwSetCursorPosCallback(window_, InputManager::mouse_callback);
-    glfwSetScrollCallback(window_, InputManager::scroll_callback);
-}
-
 float Application::getDeltaTime()
 {
     float currentFrame = static_cast<float>(glfwGetTime());
@@ -194,11 +182,19 @@ void Application::updateFPS(const float dt)
 void Application::setupImGuiUI()
 {
     ImGui::Begin("Stats");
-    ImGui::SetWindowSize(ImVec2(300, 90));
+    ImGui::SetWindowSize(ImVec2(350, 150));
     ImGui::Text("FPS: %.1f", fpsToDisplay_);
+
     glm::vec3 camPos = camera_->Position;
+    glm::vec3 camBlockPos = glm::floor(camera_->Position);
+    glm::vec3 camDir = camera_->Front;
+
     ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
+    ImGui::Text("Camera Block Position: (%.2f, %.2f, %.2f)", camBlockPos.x, camBlockPos.y, camBlockPos.z);
+    ImGui::Text("Camera Direction: (%.2f, %.2f, %.2f)", camDir.x, camDir.y, camDir.z);
+
     float zoom = camera_->Zoom;
     ImGui::Text("FOV: (%.2f)", zoom);
+
     ImGui::End();
 }
