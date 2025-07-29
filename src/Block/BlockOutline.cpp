@@ -36,7 +36,7 @@ void BlockOutline::render(const glm::mat4 &view, const glm::mat4 &projection, co
 
 void BlockOutline::createShader()
 {
-    shader_ = std::make_unique<Shader>("../shaders/blockOutlineVShader.glsl", "../shaders/blockOutlineFShader.glsl");
+    shader_ = std::make_unique<Shader>("../shaders/block_outline.vert", "../shaders/block_outline.frag");
 }
 
 void BlockOutline::configureVertexAttributes()

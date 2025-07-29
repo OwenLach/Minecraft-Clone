@@ -2,7 +2,9 @@
 #include "Chunk/Chunk.h"
 #include "Chunk/ChunkStateMachine.h"
 #include "Chunk/ChunkPipeline.h"
+#include "Shader.h"
 #include "ThreadPool.h"
+
 #include "FastNoiseLite.h"
 
 #include <iostream>
@@ -10,19 +12,18 @@
 #include <algorithm>
 #include <iostream>
 
-
-ChunkManager::ChunkManager(Shader &shader, Camera &camera, TextureAtlas &textureAtlas)
-    : shader_(shader),
-      camera_(camera),
-      textureAtlas_(textureAtlas),
-      pipeline_(std::make_unique<ChunkPipeline>(*this))
+ChunkManager::ChunkManager(Camera &camera)
+    : chunkShader_("../shaders/chunk.vert", "../shaders/chunk.frag"), camera_(camera), pipeline_(*this)
 {
 }
 
-void ChunkManager::addChunk(const ChunkCoord &coord, std::shared_ptr<Chunk> chunk)
+void ChunkManager::addChunk(const ChunkCoord &coord)
 {
-        std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
-        loadedChunks_[coord] = chunk;
+    auto chunk = std::make_shared<Chunk>(chunkShader_, textureAtlas_, coord);
+    pipeline_.generateTerrain(chunk);
+
+    std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
+    loadedChunks_[coord] = chunk;
 }
 
 void ChunkManager::removeChunk(const ChunkCoord &coord)
@@ -31,7 +32,50 @@ void ChunkManager::removeChunk(const ChunkCoord &coord)
     loadedChunks_.erase(coord);
 }
 
-std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>>  ChunkManager::getLoadedChunksCopy() const
+void ChunkManager::update()
+{
+    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+    for (const auto &[pos, chunk] : loadedChunks_)
+    {
+        if (!chunk)
+            continue;
+
+        ChunkState state = chunk->getState();
+
+        if (state == ChunkState::TERRAIN_READY && allNeighborsTerrainReady(pos))
+        {
+            // IMPORTANT: Set state immediately to prevent re-queueing
+            chunk->setState(ChunkState::MESH_GENERATING);
+            pipeline_.queueInitialMesh(chunk);
+        }
+        else if (state == ChunkState::NEEDS_MESH_REGEN && allNeighborsTerrainReady(pos))
+        {
+            chunk->setState(ChunkState::MESH_GENERATING);
+            pipeline_.queueRemesh(chunk);
+        }
+    }
+
+    pipeline_.processMeshes();
+    pipeline_.processGPUUploads();
+}
+
+void ChunkManager::render()
+{
+    textureAtlas_.bindUnit(0);
+
+    chunkShader_.use();
+    chunkShader_.setMat4("projection", camera_.getProjectionMatrix());
+    chunkShader_.setMat4("view", camera_.getViewMatrix());
+
+    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+    for (auto &[pos, chunk] : loadedChunks_)
+    {
+        if (camera_.isAABBInFrustum(chunk->getBoundingBox()) && chunk->getState() == ChunkState::LOADED)
+            chunk->render();
+    }
+}
+
+std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> ChunkManager::getLoadedChunksCopy() const
 {
     std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
     return loadedChunks_;
@@ -77,30 +121,22 @@ std::array<std::shared_ptr<Chunk>, 4> ChunkManager::getChunkNeighbors(const Chun
     return neighbors;
 }
 
-void ChunkManager::render()
-{
-    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
-    for (auto &[pos, chunk] : loadedChunks_)
-    {
-        if (camera_.isAABBInFrustum(chunk->getBoundingBox()) && chunk->getState() == ChunkState::LOADED)
-            chunk->render();
-    }
-}
-
 void ChunkManager::markNeighborsForMeshRegeneration(const ChunkCoord &coord)
 {
     auto originalChunk = getChunk(coord);
-    if (!originalChunk || originalChunk->getState() < ChunkState::TERRAIN_READY) {
+    if (!originalChunk || originalChunk->getState() < ChunkState::TERRAIN_READY)
+    {
         return; // Don't mark neighbors if this chunk isn't ready
     }
 
     for (const auto &n_chunkPtr : getChunkNeighbors(coord))
     {
-        if (!n_chunkPtr) continue;
-        
+        if (!n_chunkPtr)
+            continue;
+
         // The neighboring chunk exists, all its neighbors at least have their terrain ready, and the chunk can remesh
         if (n_chunkPtr && allNeighborsTerrainReady(n_chunkPtr->getCoord()) && n_chunkPtr->canRemesh())
-                n_chunkPtr->setState(ChunkState::NEEDS_MESH_REGEN);
+            n_chunkPtr->setState(ChunkState::NEEDS_MESH_REGEN);
     }
 }
 
@@ -117,3 +153,8 @@ bool ChunkManager::allNeighborsTerrainReady(const ChunkCoord &coord)
     }
     return true;
 }
+
+// Shader &ChunkManager::getChunkShader() const
+// {
+//     return chunkShader_;
+// }

@@ -34,7 +34,7 @@ class Chunk : public std::enable_shared_from_this<Chunk>
 {
 
 public:
-    Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &chunkManager, ChunkPipeline &pipeline);
+    Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos);
 
     // --- Core Methods ---
     void render();
@@ -73,10 +73,9 @@ private:
     glm::mat4 modelMatrix_;
 
     // ------ References
-    Shader &shader_;
+    Shader &chunkShader_;
     TextureAtlas &textureAtlas_;
-    ChunkManager &chunkManager_;
-    ChunkPipeline &pipeline_;
+
     VertexArray vao_;
     VertexBuffer vbo_;
     ElementBuffer ebo_;

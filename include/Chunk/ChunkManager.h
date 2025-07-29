@@ -20,34 +20,30 @@
 
 class ChunkManager
 {
-private:
-    std::unique_ptr<ChunkPipeline> pipeline_;
-
-    Shader &shader_;
-    TextureAtlas &textureAtlas_;
-    Camera &camera_;
-
 public:
-    ChunkManager(Shader &shader, Camera &camera, TextureAtlas &textureAtlas);
+    ChunkManager(Camera &camera);
 
-    void addChunk(const ChunkCoord &coord, std::shared_ptr<Chunk> chunk);
+    void addChunk(const ChunkCoord &coord);
     void removeChunk(const ChunkCoord &coord);
+    void render();
+    void update();
 
     std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> getLoadedChunksCopy() const;
     const std::shared_ptr<Chunk> getChunk(const ChunkCoord &coord) const;
     std::array<std::shared_ptr<Chunk>, 4> getChunkNeighbors(const ChunkCoord &coord);
-
-    void render();
-
     void markNeighborsForMeshRegeneration(const ChunkCoord &coord);
     bool allNeighborsTerrainReady(const ChunkCoord &coord);
 
 private:
+    ChunkPipeline pipeline_;
+    Shader chunkShader_;
+    TextureAtlas textureAtlas_;
+    Camera &camera_;
+
     std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks_;
     mutable std::shared_mutex loadedChunksMutex_;
 
-    static inline bool
-    isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
+    static inline bool isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
     {
         const int renderDistance = Constants::RENDER_DISTANCE;
         const int dx = chunkX - playerX;

@@ -1,23 +1,18 @@
 #include "World.h"
 #include "Chunk/ChunkManager.h"
-#include "Chunk/ChunkPipeline.h"
 #include "Chunk/ChunkCoord.h"
 #include "Block/Block.h"
 #include "Constants.h"
 #include "Camera.h"
-#include "Shader.h"
-#include "TextureAtlas.h"
 
-#include <glm/glm.hpp>
 #include <iostream>
 #include <algorithm>
 
-World::World(Camera &camera, Shader &shader, TextureAtlas &textureAtlas)
+#include <glm/glm.hpp>
+
+World::World(Camera &camera)
     : camera_(camera),
-      shader_(shader),
-      textureAtlas_(textureAtlas),
-      chunkManager_(shader, camera, textureAtlas),
-      pipeline_(chunkManager_),
+      chunkManager_(camera),
       lastPlayerChunk_(worldToChunkCoords(glm::ivec3(camera_.Position - glm::vec3(1)))),
       raycaster(*this, camera)
 {
@@ -33,10 +28,8 @@ void World::update()
         lastPlayerChunk_ = currChunk;
     }
 
+    chunkManager_.update();
     updateBlockOutline();
-    updateChunkStates();
-    pipeline_.processMeshes();
-    pipeline_.processGPUUploads();
 }
 
 void World::render()
@@ -101,9 +94,7 @@ void World::loadNewChunks(ChunkCoord center)
 
     for (const auto &chunkCoord : chunkCoordsToLoad)
     {
-        auto chunk = std::make_shared<Chunk>(shader_, textureAtlas_, chunkCoord, chunkManager_, pipeline_);
-        chunkManager_.addChunk(chunkCoord, chunk);
-        pipeline_.generateTerrain(chunk);
+        chunkManager_.addChunk(chunkCoord);
     }
 }
 
@@ -124,29 +115,6 @@ void World::unloadDistantChunks()
     for (const auto &coord : chunkCoordsToRemove)
     {
         chunkManager_.removeChunk(coord);
-    }
-}
-
-void World::updateChunkStates()
-{
-    for (const auto &[pos, chunk] : chunkManager_.getLoadedChunksCopy())
-    {
-        if (!chunk)
-            continue;
-
-        ChunkState state = chunk->getState();
-
-        if (state == ChunkState::TERRAIN_READY && chunkManager_.allNeighborsTerrainReady(pos))
-        {
-            // IMPORTANT: Set state immediately to prevent re-queueing
-            chunk->setState(ChunkState::MESH_GENERATING);
-            pipeline_.queueInitialMesh(chunk);
-        }
-        else if (state == ChunkState::NEEDS_MESH_REGEN && chunkManager_.allNeighborsTerrainReady(pos))
-        {
-            chunk->setState(ChunkState::MESH_GENERATING);
-            pipeline_.queueRemesh(chunk);
-        }
     }
 }
 
@@ -205,6 +173,7 @@ glm::ivec3 World::getBlockLocalPosition(glm::ivec3 worldPos) const
 {
     // Convert World coordinates to local chunk coordinates
     // Modulo math ensures correct wrapping even with negative positions
+
     // int localX = (worldCoords.x % Constants::CHUNK_SIZE_X + Constants::CHUNK_SIZE_X) % Constants::CHUNK_SIZE_X;
     // int localY = worldCoords.y;
     // int localZ = (worldCoords.z % Constants::CHUNK_SIZE_Z + Constants::CHUNK_SIZE_Z) % Constants::CHUNK_SIZE_Z;

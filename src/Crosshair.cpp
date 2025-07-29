@@ -26,7 +26,7 @@ void Crosshair::render()
 void Crosshair::createShader()
 {
     // Compile and link shader (implementation depends on your Shader class)
-    shader = std::make_unique<Shader>("../shaders/crosshairVShader.glsl", "../shaders/crosshairFShader.glsl");
+    shader = std::make_unique<Shader>("../shaders/crosshair.vert", "../shaders/crosshair.frag");
 }
 
 void Crosshair::configureVertexAttributes()

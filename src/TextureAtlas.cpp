@@ -8,10 +8,10 @@
 #include <iostream>
 
 TextureAtlas::TextureAtlas()
-    : tileSize(16), ID(0), atlasWidth(0), atlasHeight(0)
+    : ID_(0), atlasWidth_(0), atlasHeight_(0), tileSize_(16)
 {
-    glGenTextures(1, &ID);
-    glBindTexture(GL_TEXTURE_2D, ID);
+    glGenTextures(1, &ID_);
+    glBindTexture(GL_TEXTURE_2D, ID_);
     // set the texture wrapping parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -21,11 +21,11 @@ TextureAtlas::TextureAtlas()
     // load image, create texture and generate mipmaps
     int nrChannels;
     stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
-    unsigned char *data = stbi_load("../textures/texture-atlas.png", &atlasWidth, &atlasHeight, &nrChannels, 0);
+    unsigned char *data = stbi_load("../textures/texture-atlas.png", &atlasWidth_, &atlasHeight_, &nrChannels, 0);
     if (data)
     {
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, atlasWidth, atlasHeight, 0, format, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, atlasWidth_, atlasHeight_, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else
@@ -35,6 +35,13 @@ TextureAtlas::TextureAtlas()
     stbi_image_free(data);
 
     initBlockUVs();
+}
+
+void TextureAtlas::bindUnit(unsigned int unit)
+{
+
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(GL_TEXTURE_2D, ID_);
 }
 
 void TextureAtlas::initBlockUVs()
@@ -54,13 +61,13 @@ void TextureAtlas::initBlockUVs()
         blockUVs.side = getTileUVs(indices.side.x, indices.side.y);
         blockUVs.bottom = getTileUVs(indices.bottom.x, indices.bottom.y);
 
-        blockUVsMap[type] = blockUVs;
+        blockUVsMap_[type] = blockUVs;
     }
 }
 
 const std::array<glm::vec2, 4> &TextureAtlas::getBlockFaceUVs(BlockType type, BlockFaces face)
 {
-    const auto &blockUVs = blockUVsMap.at(type);
+    const auto &blockUVs = blockUVsMap_.at(type);
 
     if (face == BlockFaces::Top)
     {
@@ -78,8 +85,8 @@ const std::array<glm::vec2, 4> &TextureAtlas::getBlockFaceUVs(BlockType type, Bl
 
 std::array<glm::vec2, 4> TextureAtlas::getTileUVs(int tileX, int tileY)
 {
-    int numTilesX = atlasWidth / tileSize;  // 16
-    int numTilesY = atlasHeight / tileSize; // 16
+    int numTilesX = atlasWidth_ / tileSize_;  // 16
+    int numTilesY = atlasHeight_ / tileSize_; // 16
 
     // Flip tileY because UV origin is bottom-left but tile indexing may be top-left
     int flippedTileY = numTilesY - 1 - tileY;
@@ -98,8 +105,4 @@ std::array<glm::vec2, 4> TextureAtlas::getTileUVs(int tileX, int tileY)
     glm::vec2 bottomRight = uvOffset + glm::vec2(tileUVsize.x, 0.0f);
 
     return {bottomLeft, bottomRight, topRight, topLeft};
-
-    // return {
-    //     bottomLeft, bottomRight, topRight,
-    //     topRight, topLeft, bottomLeft};
 }
