@@ -17,8 +17,8 @@
 #include <cmath>
 #include <functional>
 
-Chunk::Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos, ChunkManager &chunkManager, ChunkPipeline &pipeline)
-    : shader_(shader), textureAtlas_(atlas), chunkCoord_(pos), chunkManager_(chunkManager), pipeline_(pipeline), indexCount_(0), vertexCount_(0)
+Chunk::Chunk(Shader &chunkShader, TextureAtlas &atlas, ChunkCoord pos)
+    : chunkShader_(chunkShader), textureAtlas_(atlas), chunkCoord_(pos), indexCount_(0), vertexCount_(0)
 {
     const int chunkSize_X = Constants::CHUNK_SIZE_X;
     const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
@@ -41,7 +41,7 @@ void Chunk::render()
     if (!stateMachine_.isReady() || indexCount_ == 0)
         return;
 
-    shader_.use();
+    chunkShader_.use();
 
     vao_.bind();
     vbo_.bind();
@@ -50,7 +50,7 @@ void Chunk::render()
     glm::mat4 model = glm::mat4(1.0f);
     modelMatrix_ = glm::translate(model, glm::vec3(chunkCoord_.x * Constants::CHUNK_SIZE_X, 0, chunkCoord_.z * Constants::CHUNK_SIZE_Z));
 
-    shader_.setMat4("model", modelMatrix_);
+    chunkShader_.setMat4("model", modelMatrix_);
 
     glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, 0);
 }
@@ -92,13 +92,13 @@ void Chunk::generateTerrain()
                 }
 
                 // Cave generation
-                // float caveVal = terrainGen_.getCaveNoise(worldX, (float)y, worldZ);
-                // if (y < height - 5 &&
-                //     caveVal > Constants::CAVE_THRESHOLD &&
-                //     y > 0)
-                // {
-                //     type = BlockType::Air;
-                // }
+                float caveVal = terrainGen_.getCaveNoise(worldX, (float)y, worldZ);
+                if (y < height - 5 &&
+                    caveVal > Constants::CAVE_THRESHOLD &&
+                    y > 0)
+                {
+                    type = BlockType::Air;
+                }
 
                 glm::ivec3 pos = {x, y, z};
                 const size_t index = getBlockIndex(pos);
@@ -110,8 +110,6 @@ void Chunk::generateTerrain()
 
 void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    // ScopedTimer timer("Chunk::generateMesh");
-
     vertices_.clear();
     indices_.clear();
 

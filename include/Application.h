@@ -20,8 +20,6 @@ private:
     GLFWwindow *window_;
     std::unique_ptr<Camera> camera_;
     std::unique_ptr<InputManager> inputManager_;
-    std::unique_ptr<Shader> shader_;
-    std::unique_ptr<TextureAtlas> textureAtlas_;
     std::unique_ptr<ImGuiManager> imguiManager_;
     std::unique_ptr<World> world_;
     std::unique_ptr<Crosshair> crosshair_;

@@ -84,9 +84,7 @@ void Application::initComponents()
 {
     imguiManager_ = std::make_unique<ImGuiManager>(window_);
     camera_ = std::make_unique<Camera>(glm::vec3(0.0f, 150.0f, 0.0f));
-    shader_ = std::make_unique<Shader>("../shaders/vShader.glsl", "../shaders/fShader.glsl");
-    textureAtlas_ = std::make_unique<TextureAtlas>();
-    world_ = std::make_unique<World>(*camera_, *shader_, *textureAtlas_);
+    world_ = std::make_unique<World>(*camera_);
     inputManager_ = std::make_unique<InputManager>(*camera_, window_, *world_);
     crosshair_ = std::make_unique<Crosshair>();
 }
@@ -120,13 +118,6 @@ void Application::render()
 
     glClearColor(0.529f, 0.808f, 0.922f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureAtlas_->ID);
-
-    shader_->use();
-    shader_->setMat4("projection", camera_->getProjectionMatrix());
-    shader_->setMat4("view", camera_->getViewMatrix());
 
     world_->render();
     crosshair_->render();

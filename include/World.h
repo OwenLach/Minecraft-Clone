@@ -1,10 +1,9 @@
 #pragma once
 
 #include "Chunk/ChunkManager.h"
-#include "Chunk/ChunkPipeline.h"
+#include "Block/BlockOutline.h"
 #include "Raycaster.h"
 #include "Constants.h"
-#include "Block/BlockOutline.h"
 
 #include <glm/glm.hpp>
 
@@ -17,7 +16,7 @@ class TextureAtlas;
 class World
 {
 public:
-    World(Camera &camera, Shader &shader, TextureAtlas &textureAtlas);
+    World(Camera &camera);
 
     void update();
     void render();
@@ -29,12 +28,9 @@ public:
 
 private:
     Camera &camera_;
-    Shader &shader_;
-    TextureAtlas &textureAtlas_;
-
     ChunkManager chunkManager_;
-    ChunkPipeline pipeline_;
     ChunkCoord lastPlayerChunk_;
+
     Raycaster raycaster;
     BlockOutline blockOutline_;
     glm::ivec3 targetBlockPos_;
@@ -42,7 +38,6 @@ private:
 
     void loadNewChunks(ChunkCoord center);
     void unloadDistantChunks();
-    void updateChunkStates();
     void updateBlockOutline();
 
     // Coordinate conversions
