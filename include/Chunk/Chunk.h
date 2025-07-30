@@ -6,6 +6,7 @@
 #include "Shader.h"
 #include "Chunk/ChunkCoord.h"
 #include "Chunk/ChunkStateMachine.h"
+#include "Chunk/ChunkMesh.h"
 #include "Chunk/Vertex.h"
 #include "FastNoiseLite.h"
 #include "TerrainGenerator.h"
@@ -60,11 +61,7 @@ private:
     // ---- Core Data ------
     std::vector<Block> blocks_;
 
-    std::vector<unsigned int> indices_;
-    std::vector<Vertex> vertices_;
-    size_t vertexCount_ = 0;
-    int indexCount_ = 0;
-
+    ChunkMesh mesh_;
     ChunkStateMachine stateMachine_;
     ChunkCoord chunkCoord_;
     BoundingBox boundingBox_;
@@ -72,8 +69,6 @@ private:
 
     glm::mat4 modelMatrix_;
 
-    // ------ References
-    Shader &chunkShader_;
     TextureAtlas &textureAtlas_;
 
     VertexArray vao_;
