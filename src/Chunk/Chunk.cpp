@@ -18,7 +18,7 @@
 #include <functional>
 
 Chunk::Chunk(Shader &chunkShader, TextureAtlas &atlas, ChunkCoord pos)
-    : chunkShader_(chunkShader), textureAtlas_(atlas), chunkCoord_(pos), indexCount_(0), vertexCount_(0)
+    : mesh_(chunkShader), textureAtlas_(atlas), chunkCoord_(pos)
 {
     const int chunkSize_X = Constants::CHUNK_SIZE_X;
     const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
@@ -26,33 +26,17 @@ Chunk::Chunk(Shader &chunkShader, TextureAtlas &atlas, ChunkCoord pos)
 
     blocks_.resize(chunkSize_X * chunkSize_Y * chunkSize_Z);
 
-    vertices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 4); // Max 4 unique vertices per face
-    indices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 6);  // Max 6 indices per face
-
     boundingBox_.min = glm::vec3(chunkCoord_.x * chunkSize_X, 0, chunkCoord_.z * chunkSize_Z);
     boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, chunkSize_Y, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
-
-    configureVertexAttributes();
 }
 
 void Chunk::render()
 {
-    // make sure chunk is loaded
-    if (!stateMachine_.isReady() || indexCount_ == 0)
+
+    if (!stateMachine_.isReady())
         return;
 
-    chunkShader_.use();
-
-    vao_.bind();
-    vbo_.bind();
-    ebo_.bind();
-
-    glm::mat4 model = glm::mat4(1.0f);
-    modelMatrix_ = glm::translate(model, glm::vec3(chunkCoord_.x * Constants::CHUNK_SIZE_X, 0, chunkCoord_.z * Constants::CHUNK_SIZE_Z));
-
-    chunkShader_.setMat4("model", modelMatrix_);
-
-    glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, 0);
+    mesh_.render(chunkCoord_);
 }
 
 void Chunk::generateTerrain()
@@ -110,9 +94,6 @@ void Chunk::generateTerrain()
 
 void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 {
-    vertices_.clear();
-    indices_.clear();
-
     // loop through chunk and generate each blocks mesh
     for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
     {
@@ -134,29 +115,18 @@ void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
         }
     }
 
-    vertices_.shrink_to_fit();
-    indices_.shrink_to_fit();
+    // std::cout << "Mesh has " << mesh_.vertices_.size() << " vertices and " << mesh_.indices_.size() << " indices" << std::endl;
 }
 
 void Chunk::uploadMeshToGPU()
 {
-    if (vertices_.empty() || indices_.empty())
+    if (mesh_.vertices_.empty() || mesh_.indices_.empty())
     {
-        vertexCount_ = 0;
-        indexCount_ = 0;
+        std::cout << "Warning: Attempting to upload empty mesh for chunk " << chunkCoord_.x << "," << chunkCoord_.z << std::endl;
         return;
     }
 
-    vao_.bind();
-
-    vbo_.setData(reinterpret_cast<const float *>(vertices_.data()), vertices_.size() * sizeof(Vertex));
-    vertexCount_ = vertices_.size();
-
-    indexCount_ = indices_.size();
-    ebo_.setData(indices_.data(), indexCount_ * sizeof(unsigned int));
-
-    vertices_.clear();
-    indices_.clear();
+    mesh_.uploadMesh();
 }
 
 void Chunk::removeBlockAt(glm::ivec3 pos)
@@ -225,7 +195,7 @@ void Chunk::generateFaceVertices(const Block &block, BlockFaces face, const std:
         return 1.0f - occlusion * 0.2f; // Simple mapping: 1.0, 0.8, 0.6, 0.4
     };
 
-    unsigned int baseVertexIndex = static_cast<unsigned int>(vertices_.size());
+    unsigned int baseVertexIndex = static_cast<unsigned int>(mesh_.vertices_.size());
     // Make vertex for each corner of face
     for (int i = 0; i < 4; i++)
     {
@@ -233,12 +203,12 @@ void Chunk::generateFaceVertices(const Block &block, BlockFaces face, const std:
         v.position = corners[i] + glm::vec3(block.position);
         v.textureCoords = faceUVs[i];
         v.ao = computeAO(aoData[i]);
-        vertices_.push_back(v);
+        mesh_.vertices_.push_back(v);
     }
 
     for (size_t i = 0; i < 6; i++)
     {
-        indices_.push_back(baseVertexIndex + BlockFaceData::quadIndices[i]);
+        mesh_.indices_.push_back(baseVertexIndex + BlockFaceData::quadIndices[i]);
     }
 }
 
