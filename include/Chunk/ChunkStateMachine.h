@@ -24,7 +24,6 @@ public:
     ChunkState getState() const;
     bool canTransitionTo(ChunkState newState) const;
     bool isProcessing() const;
-    bool isReady() const;
     bool canUnload() const;
     bool canRemesh() const;
 

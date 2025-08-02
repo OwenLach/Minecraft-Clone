@@ -70,7 +70,7 @@ void ChunkManager::render()
     std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
     for (auto &[pos, chunk] : loadedChunks_)
     {
-        if (camera_.isAABBInFrustum(chunk->getBoundingBox()) && chunk->getState() == ChunkState::LOADED)
+        if (camera_.isAABBInFrustum(chunk->getBoundingBox()))
             chunk->render();
     }
 }

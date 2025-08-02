@@ -20,7 +20,6 @@ public:
 
     void update();
     void render();
-
     void breakBlock();
     void placeBlock();
 
