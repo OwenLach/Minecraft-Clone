@@ -11,8 +11,7 @@
 #include <iostream>
 
 ChunkPipeline::ChunkPipeline(ChunkManager &chunkManager)
-    : threadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() / 2 : 1),
-      chunkManager_(chunkManager)
+    : threadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() / 2 : 1), chunkManager_(chunkManager)
 {
 }
 
@@ -41,20 +40,22 @@ void ChunkPipeline::queueRemesh(std::shared_ptr<Chunk> chunk)
 void ChunkPipeline::processMeshes()
 {
     std::lock_guard<std::mutex> lock(meshMutex_);
-    
+
     const int max_meshes = Constants::MAX_MESHES_PER_FRAME;
     int meshed = 0;
 
     // 1. Prioritize Initial Meshes
-    while (meshed < max_meshes && !initialMeshQueue_.empty()) {
+    while (meshed < max_meshes && !initialMeshQueue_.empty())
+    {
         std::shared_ptr<Chunk> chunk = initialMeshQueue_.front();
         initialMeshQueue_.pop();
         generateMesh(chunk);
         meshed++;
     }
-   
+
     // 2. Process Re-meshes if we have remaining capacity
-    while (meshed < max_meshes && !remeshQueue_.empty()) {
+    while (meshed < max_meshes && !remeshQueue_.empty())
+    {
         std::shared_ptr<Chunk> chunk = remeshQueue_.front();
         remeshQueue_.pop();
         generateMesh(chunk);
@@ -65,7 +66,8 @@ void ChunkPipeline::processMeshes()
 void ChunkPipeline::generateMesh(std::shared_ptr<Chunk> chunk)
 {
     threadPool_.enqueue([this, chunk]() { //
-        if (!chunk) return;
+        if (!chunk)
+            return;
 
         chunk->generateMesh(chunkManager_.getChunkNeighbors(chunk->getCoord()));
         chunk->setState(ChunkState::MESH_READY);
@@ -75,7 +77,6 @@ void ChunkPipeline::generateMesh(std::shared_ptr<Chunk> chunk)
         }
     });
 }
-
 
 void ChunkPipeline::processGPUUploads()
 {

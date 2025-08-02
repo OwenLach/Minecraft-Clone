@@ -22,11 +22,6 @@ ChunkMesh::ChunkMesh(Shader &chunkShader) : chunkShader_(chunkShader)
 
 void ChunkMesh::render(const ChunkCoord &coord)
 {
-    if (verticesCount_ == 0 || indicesCount_ == 0)
-    {
-        return;
-    }
-
     chunkShader_.use();
     vao_.bind();
 
@@ -59,6 +54,11 @@ void ChunkMesh::uploadMesh()
 
     vertices_.clear();
     indices_.clear();
+}
+
+void ChunkMesh::setMeshValid()
+{
+    hasValidMesh_.store(true);
 }
 
 void ChunkMesh::configureVertexAttributes()

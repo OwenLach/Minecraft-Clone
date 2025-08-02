@@ -32,11 +32,8 @@ Chunk::Chunk(Shader &chunkShader, TextureAtlas &atlas, ChunkCoord pos)
 
 void Chunk::render()
 {
-
-    if (!stateMachine_.isReady())
-        return;
-
-    mesh_.render(chunkCoord_);
+    if (mesh_.hasValidMesh_)
+        mesh_.render(chunkCoord_);
 }
 
 void Chunk::generateTerrain()
@@ -115,6 +112,7 @@ void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
         }
     }
 
+    mesh_.setMeshValid();
     // std::cout << "Mesh has " << mesh_.vertices_.size() << " vertices and " << mesh_.indices_.size() << " indices" << std::endl;
 }
 
