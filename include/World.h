@@ -2,6 +2,7 @@
 
 #include "Chunk/ChunkManager.h"
 #include "Block/BlockOutline.h"
+#include "Block/BlockTypes.h"
 #include "Raycaster.h"
 #include "Constants.h"
 
@@ -22,6 +23,7 @@ public:
     void render();
     void breakBlock();
     void placeBlock();
+    void setPlayerBlockType(BlockType type);
 
     bool isBlockSolid(glm::ivec3 blockWorldPos) const;
 
@@ -29,6 +31,7 @@ private:
     Camera &camera_;
     ChunkManager chunkManager_;
     ChunkCoord lastPlayerChunk_;
+    BlockType playerBlockType_ = BlockType::Dirt;
 
     Raycaster raycaster;
     BlockOutline blockOutline_;

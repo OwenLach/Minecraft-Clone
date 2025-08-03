@@ -2,6 +2,7 @@
 #include "Chunk/ChunkManager.h"
 #include "Chunk/ChunkCoord.h"
 #include "Block/Block.h"
+#include "Block/BlockFaceData.h"
 #include "Constants.h"
 #include "Camera.h"
 
@@ -55,15 +56,52 @@ void World::breakBlock()
             chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
         }
     }
-    else
-    {
-        std::cout << "BLOCK MISSED" << std::endl;
-    }
 }
 
 void World::placeBlock()
 {
-    std::cout << "PLACING BLOCK" << std::endl;
+    if (raycaster.cast())
+    {
+        glm::ivec3 blockHitPos = raycaster.getHitBlockPosition();
+        BlockFaces hitFace = raycaster.getHitBlockFace();
+        glm::ivec3 dir;
+
+        switch (hitFace)
+        {
+        case BlockFaces::Front:
+            dir = glm::ivec3(0, 0, 1);
+            break;
+        case BlockFaces::Back:
+            dir = glm::ivec3(0, 0, -1);
+            break;
+        case BlockFaces::Left:
+            dir = glm::ivec3(-1, 0, 0);
+            break;
+        case BlockFaces::Right:
+            dir = glm::ivec3(1, 0, 0);
+            break;
+        case BlockFaces::Bottom:
+            dir = glm::ivec3(0, -1, 0);
+            break;
+        case BlockFaces::Top:
+            dir = glm::ivec3(0, 1, 0);
+            break;
+        }
+
+        glm::ivec3 posToPlace = blockHitPos + dir;
+        auto chunk = chunkManager_.getChunk(worldToChunkCoords(posToPlace));
+        if (chunk)
+        {
+            chunk->placeBlockAt(getBlockLocalPosition(posToPlace), playerBlockType_);
+            chunk->setState(ChunkState::NEEDS_MESH_REGEN);
+            chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
+        }
+    }
+}
+
+void World::setPlayerBlockType(BlockType type)
+{
+    playerBlockType_ = type;
 }
 
 void World::loadNewChunks(ChunkCoord center)
