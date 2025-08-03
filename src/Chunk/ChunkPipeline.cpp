@@ -2,6 +2,7 @@
 #include "Chunk/ChunkStateMachine.h"
 #include "Chunk/ChunkManager.h"
 #include "Chunk/Chunk.h"
+#include "LightSystem.h"
 
 #include "Performance/ScopedTimer.h"
 
@@ -10,9 +11,15 @@
 #include <thread>
 #include <iostream>
 
-ChunkPipeline::ChunkPipeline(ChunkManager &chunkManager)
-    : threadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() / 2 : 1), chunkManager_(chunkManager)
+ChunkPipeline::ChunkPipeline()
+    : threadPool_(std::thread::hardware_concurrency() > 1 ? std::thread::hardware_concurrency() / 2 : 1)
 {
+}
+
+void ChunkPipeline::init(ChunkManager *chunkManager, LightSystem *lightSystem)
+{
+    chunkManager_ = chunkManager;
+    lightSystem_ = lightSystem;
 }
 
 void ChunkPipeline::generateTerrain(std::shared_ptr<Chunk> chunk)
@@ -21,7 +28,7 @@ void ChunkPipeline::generateTerrain(std::shared_ptr<Chunk> chunk)
     threadPool_.enqueue([this, chunk]() { //
         chunk->generateTerrain();
         chunk->setState(ChunkState::TERRAIN_READY);
-        chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
+        chunkManager_->markNeighborsForMeshRegeneration(chunk->getCoord());
     });
 }
 
@@ -69,7 +76,7 @@ void ChunkPipeline::generateMesh(std::shared_ptr<Chunk> chunk)
         if (!chunk)
             return;
 
-        chunk->generateMesh(chunkManager_.getChunkNeighbors(chunk->getCoord()));
+        chunk->generateMesh(chunkManager_->getChunkNeighbors(chunk->getCoord()));
         chunk->setState(ChunkState::MESH_READY);
         {
             std::lock_guard<std::mutex> lock(uploadMutex_);
