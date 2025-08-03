@@ -13,10 +13,14 @@
 
 World::World(Camera &camera)
     : camera_(camera),
+      pipeline_(),
       chunkManager_(camera),
+      lightSystem_(),
       lastPlayerChunk_(worldToChunkCoords(glm::ivec3(camera_.Position - glm::vec3(1)))),
       raycaster(*this, camera)
 {
+    pipeline_.init(&chunkManager_, &lightSystem_);
+    chunkManager_.init(&pipeline_);
 }
 
 void World::update()
@@ -30,7 +34,7 @@ void World::update()
     }
 
     chunkManager_.update();
-    updateBlockOutline();
+    updateSelectedBlockOutline();
 }
 
 void World::render()
@@ -156,7 +160,7 @@ void World::unloadDistantChunks()
     }
 }
 
-void World::updateBlockOutline()
+void World::updateSelectedBlockOutline()
 {
     if (raycaster.cast())
     {

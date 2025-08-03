@@ -13,14 +13,21 @@
 #include <iostream>
 
 ChunkManager::ChunkManager(Camera &camera)
-    : chunkShader_("../shaders/chunk.vert", "../shaders/chunk.frag"), camera_(camera), pipeline_(*this)
+    : camera_(camera),
+      chunkShader_("../shaders/chunk.vert", "../shaders/chunk.frag"),
+      textureAtlas_()
 {
+}
+
+void ChunkManager::init(ChunkPipeline *pipeline)
+{
+    pipeline_ = pipeline;
 }
 
 void ChunkManager::addChunk(const ChunkCoord &coord)
 {
     auto chunk = std::make_shared<Chunk>(chunkShader_, textureAtlas_, coord);
-    pipeline_.generateTerrain(chunk);
+    pipeline_->generateTerrain(chunk);
 
     std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
     loadedChunks_[coord] = chunk;
@@ -46,17 +53,20 @@ void ChunkManager::update()
         {
             // IMPORTANT: Set state immediately to prevent re-queueing
             chunk->setState(ChunkState::MESH_GENERATING);
-            pipeline_.queueInitialMesh(chunk);
+            pipeline_->queueInitialMesh(chunk);
+
+            // chunk->setState(ChunkState::LIGHT_PROPOGATING);
+            // pipeline_->propogateLight(chunk);
         }
         else if (state == ChunkState::NEEDS_MESH_REGEN && allNeighborsTerrainReady(pos))
         {
             chunk->setState(ChunkState::MESH_GENERATING);
-            pipeline_.queueRemesh(chunk);
+            pipeline_->queueRemesh(chunk);
         }
     }
 
-    pipeline_.processMeshes();
-    pipeline_.processGPUUploads();
+    pipeline_->processMeshes();
+    pipeline_->processGPUUploads();
 }
 
 void ChunkManager::render()

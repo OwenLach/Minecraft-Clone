@@ -1,6 +1,8 @@
 #pragma once
 
+#include "LightSystem.h"
 #include "Chunk/ChunkManager.h"
+#include "Chunk/ChunkPipeline.h"
 #include "Block/BlockOutline.h"
 #include "Block/BlockTypes.h"
 #include "Raycaster.h"
@@ -29,10 +31,12 @@ public:
 
 private:
     Camera &camera_;
+    // Owns all the systems/managers
+    ChunkPipeline pipeline_;
     ChunkManager chunkManager_;
+    LightSystem lightSystem_;
     ChunkCoord lastPlayerChunk_;
     BlockType playerBlockType_ = BlockType::Dirt;
-
     Raycaster raycaster;
     BlockOutline blockOutline_;
     glm::ivec3 targetBlockPos_;
@@ -40,7 +44,7 @@ private:
 
     void loadNewChunks(ChunkCoord center);
     void unloadDistantChunks();
-    void updateBlockOutline();
+    void updateSelectedBlockOutline();
 
     // Coordinate conversions
     glm::ivec3 chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const;

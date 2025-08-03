@@ -2,7 +2,6 @@
 
 #include "Chunk/Chunk.h"
 #include "Chunk/ChunkCoord.h"
-#include "Chunk/ChunkPipeline.h"
 #include "Block/Block.h"
 #include "ThreadPool.h"
 #include "Shader.h"
@@ -18,11 +17,14 @@
 #include <vector>
 #include <memory>
 
+class ChunkPipeline;
+
 class ChunkManager
 {
 public:
     ChunkManager(Camera &camera);
 
+    void init(ChunkPipeline *pipeline);
     void addChunk(const ChunkCoord &coord);
     void removeChunk(const ChunkCoord &coord);
     void render();
@@ -35,10 +37,10 @@ public:
     bool allNeighborsTerrainReady(const ChunkCoord &coord);
 
 private:
-    ChunkPipeline pipeline_;
+    Camera &camera_;
     Shader chunkShader_;
     TextureAtlas textureAtlas_;
-    Camera &camera_;
+    ChunkPipeline *pipeline_;
 
     std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks_;
     mutable std::shared_mutex loadedChunksMutex_;

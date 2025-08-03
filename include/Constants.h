@@ -3,14 +3,14 @@
 namespace Constants
 {
     // screen settings
-    constexpr unsigned int SCREEN_W = 1200;
-    constexpr unsigned int SCREEN_H = 800;
+    constexpr unsigned int SCREEN_W = 1800;
+    constexpr unsigned int SCREEN_H = 900;
 
     // camera setttings
     constexpr float YAW = -90.0f;
     constexpr float PITCH = 0.0f;
     constexpr float ZOOM = 80.0f;
-    constexpr float PLAYER_SPEED = 20.0f;
+    constexpr float PLAYER_SPEED = 15.0f;
     constexpr float MOUSE_SENSITIVITY = 0.05f;
     constexpr float ZOOM_SENSITIVITY = 5.0f;
 
