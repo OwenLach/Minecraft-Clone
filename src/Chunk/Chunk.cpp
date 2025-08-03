@@ -133,6 +133,12 @@ void Chunk::removeBlockAt(glm::ivec3 pos)
     blocks_[index] = Block(BlockType::Air, pos);
 }
 
+void Chunk::placeBlockAt(glm::ivec3 pos, BlockType type)
+{
+    const size_t index = getBlockIndex(pos);
+    blocks_[index] = Block(type, pos);
+}
+
 void Chunk::configureVertexAttributes()
 {
     vao_.bind();

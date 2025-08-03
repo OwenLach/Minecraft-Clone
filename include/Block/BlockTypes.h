@@ -5,10 +5,13 @@ enum BlockType
 {
     Air,
     Grass,
+    Dirt,
     Stone,
     Cobblestone,
-    CryingObsidian,
-    Dirt
+    Log,
+    Plank,
+    Brick
+
 };
 
 struct BlockTextureAtlasIndicies

@@ -49,9 +49,12 @@ void TextureAtlas::initBlockUVs()
     std::unordered_map<BlockType, BlockTextureAtlasIndicies> blockIndicies;
     //                                        top             side                bottom
     blockIndicies[BlockType::Grass] = {glm::ivec2(0, 0), glm::ivec2(3, 0), glm::ivec2(2, 0)};
+    blockIndicies[BlockType::Dirt] = {glm::ivec2(2, 0), glm::ivec2(2, 0), glm::ivec2(2, 0)};
     blockIndicies[BlockType::Stone] = {glm::ivec2(1, 0), glm::ivec2(1, 0), glm::ivec2(1, 0)};
     blockIndicies[BlockType::Cobblestone] = {glm::ivec2(0, 1), glm::ivec2(0, 1), glm::ivec2(0, 1)};
-    blockIndicies[BlockType::Dirt] = {glm::ivec2(2, 0), glm::ivec2(2, 0), glm::ivec2(2, 0)};
+    blockIndicies[BlockType::Log] = {glm::ivec2(5, 1), glm::ivec2(4, 1), glm::ivec2(4, 1)};
+    blockIndicies[BlockType::Plank] = {glm::ivec2(4, 0), glm::ivec2(4, 0), glm::ivec2(4, 0)};
+    blockIndicies[BlockType::Brick] = {glm::ivec2(7, 0), glm::ivec2(7, 0), glm::ivec2(7, 0)};
 
     for (const auto &[type, indices] : blockIndicies)
     {

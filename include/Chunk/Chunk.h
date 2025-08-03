@@ -43,6 +43,7 @@ public:
     void generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     void uploadMeshToGPU();
     void removeBlockAt(glm::ivec3 pos);
+    void placeBlockAt(glm::ivec3 pos, BlockType type);
 
     // State
     ChunkState getState() const;

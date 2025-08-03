@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Block/BlockFaceData.h"
+
 #include <glm/glm.hpp>
 
 class World;
@@ -12,6 +14,7 @@ public:
     bool cast();
 
     glm::ivec3 getHitBlockPosition() const;
+    BlockFaces getHitBlockFace() const;
 
 private:
     const int maxDist_;
@@ -22,6 +25,7 @@ private:
     glm::vec3 deltaDist_;
 
     glm::ivec3 hitBlockPos_;
+    BlockFaces hitBlockFace_;
 
     World &world_;
     Camera &camera_;

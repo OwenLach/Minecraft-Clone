@@ -1,14 +1,16 @@
 #include "Raycaster.h"
 #include "World.h"
 #include "Constants.h"
+#include "Block/BlockFaceData.h"
+
 #include <glm/glm.hpp>
+
 #include <iostream>
 
-Raycaster::Raycaster(World &world, Camera &camera)
-    : maxDist_(Constants::MAX_RAYCAST_DIST),
-      world_(world),
-      camera_(camera),
-      hitBlockPos_(glm::ivec3(0))
+Raycaster::Raycaster(World &world, Camera &camera) : maxDist_(Constants::MAX_RAYCAST_DIST),
+                                                     world_(world),
+                                                     camera_(camera),
+                                                     hitBlockPos_(glm::ivec3(0))
 {
 }
 
@@ -68,38 +70,51 @@ bool Raycaster::cast()
         }
     }
 
+    int lastStepAxis = -1; // 0 for x, 1 for y, 2, for z
+
     // Step thorugh voxels
     for (int i = 0; i < maxDist_; i++)
     {
-        // std::cout << "Stepping to voxel "
-        //           << currVoxelPos_.x << ", "
-        //           << currVoxelPos_.y << ", "
-        //           << currVoxelPos_.z << std::endl;
-
         // Find which axis to step along
         if (tMax.x < tMax.y && tMax.x < tMax.z)
         {
             // Step along X
             tMax.x += deltaDist_.x;
             currVoxelPos_.x += step_.x;
+            lastStepAxis = 0;
         }
         else if (tMax.y < tMax.z)
         {
             // Step along Y
             tMax.y += deltaDist_.y;
             currVoxelPos_.y += step_.y;
+            lastStepAxis = 1;
         }
         else
         {
             // Step along Z
             tMax.z += deltaDist_.z;
             currVoxelPos_.z += step_.z;
+            lastStepAxis = 2;
         }
 
         // Check current voxel
         if (world_.isBlockSolid(currVoxelPos_))
         {
             hitBlockPos_ = currVoxelPos_;
+
+            switch (lastStepAxis)
+            {
+            case 0:
+                hitBlockFace_ = (step_.x > 0) ? BlockFaces::Left : BlockFaces::Right;
+                break;
+            case 1:
+                hitBlockFace_ = (step_.y > 0) ? BlockFaces::Bottom : BlockFaces::Top;
+                break;
+            case 2:
+                hitBlockFace_ = (step_.z > 0) ? BlockFaces::Back : BlockFaces::Front;
+                break;
+            }
             return true;
         }
     }
@@ -110,4 +125,9 @@ bool Raycaster::cast()
 glm::ivec3 Raycaster::getHitBlockPosition() const
 {
     return hitBlockPos_;
+}
+
+BlockFaces Raycaster::getHitBlockFace() const
+{
+    return hitBlockFace_;
 }

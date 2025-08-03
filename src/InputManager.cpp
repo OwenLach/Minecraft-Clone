@@ -21,6 +21,7 @@ void InputManager::setInputCallbacks()
     glfwSetCursorPosCallback(window_, InputManager::mouse_callback);
     glfwSetMouseButtonCallback(window_, InputManager::mouse_button_callback);
     glfwSetScrollCallback(window_, InputManager::scroll_callback);
+    glfwSetKeyCallback(window_, key_callback);
 }
 
 void InputManager::processKeyboard(GLFWwindow *window, float deltaTime)
@@ -40,6 +41,39 @@ void InputManager::processKeyboard(GLFWwindow *window, float deltaTime)
         camera_.ProcessKeyboard(UP, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
         camera_.ProcessKeyboard(DOWN, deltaTime);
+}
+
+void InputManager::key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
+{
+    InputManager *inputManager = static_cast<InputManager *>(glfwGetWindowUserPointer(window));
+    if (action == GLFW_PRESS)
+    {
+        // std::cout << key << std::endl;
+        switch (key)
+        {
+        case GLFW_KEY_1:
+            inputManager->world_.setPlayerBlockType(BlockType::Grass);
+            break;
+        case GLFW_KEY_2:
+            inputManager->world_.setPlayerBlockType(BlockType::Dirt);
+            break;
+        case GLFW_KEY_3:
+            inputManager->world_.setPlayerBlockType(BlockType::Stone);
+            break;
+        case GLFW_KEY_4:
+            inputManager->world_.setPlayerBlockType(BlockType::Cobblestone);
+            break;
+        case GLFW_KEY_5:
+            inputManager->world_.setPlayerBlockType(BlockType::Log);
+            break;
+        case GLFW_KEY_6:
+            inputManager->world_.setPlayerBlockType(BlockType::Plank);
+            break;
+        case GLFW_KEY_7:
+            inputManager->world_.setPlayerBlockType(BlockType::Brick);
+            break;
+        }
+    }
 }
 
 void InputManager::framebuffer_size_callback(GLFWwindow *window, int width, int height)
