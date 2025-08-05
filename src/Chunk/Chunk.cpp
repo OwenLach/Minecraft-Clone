@@ -104,7 +104,7 @@ void Chunk::generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks)
 
                 if (block.type == BlockType::Air)
                     continue;
-                if (isBlockHidden(pos))
+                if (isBlockHiddenByNeighbors(pos))
                     continue;
 
                 generateBlockMesh(block, neighborChunks);
@@ -149,6 +149,7 @@ void Chunk::configureVertexAttributes()
     layout.push<float>(3); // position
     layout.push<float>(2); // texture coords
     layout.push<float>(1); // AO
+    // layout.push<float>(1); // Light
     vao_.addBuffer(vbo_, layout);
 }
 
@@ -180,6 +181,7 @@ void Chunk::generateBlockMesh(const Block &block, const std::array<std::shared_p
 
 void Chunk::generateFaceVertices(const Block &block, BlockFaces face, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
 {
+    // std::cout << "Light value for block: " << static_cast<float>(block.skylight) / 15.0f << std::endl;
     const auto &faceUVs = textureAtlas_.getBlockFaceUVs(block.type, face);
     const auto &corners = BlockFaceData::faceCorners.at(face);
     const auto &aoData = BlockFaceData::aoOffsets.at(face);
@@ -207,6 +209,8 @@ void Chunk::generateFaceVertices(const Block &block, BlockFaces face, const std:
         v.position = corners[i] + glm::vec3(block.position);
         v.textureCoords = faceUVs[i];
         v.ao = computeAO(aoData[i]);
+        // // Skylight = 0-15, so normalize to [0 - 1] for OpenGL
+        // v.light = static_cast<float>(block.skylight) / 15.0f;
         mesh_.vertices_.push_back(v);
     }
 
@@ -284,7 +288,7 @@ BlockType Chunk::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec
     }
 }
 
-const Block &Chunk::getBlockLocal(const glm::ivec3 &pos) const
+Block &Chunk::getBlockLocal(const glm::ivec3 &pos)
 {
     if (!blockInChunkBounds(pos))
     {
@@ -302,7 +306,7 @@ inline bool Chunk::isTransparent(BlockType type) const
     return type == BlockType::Air;
 }
 
-bool Chunk::isBlockHidden(const glm::ivec3 &pos)
+bool Chunk::isBlockHiddenByNeighbors(const glm::ivec3 &pos)
 {
     // Quick check if all 6 neighbors are solid blocks
     for (const auto &offset : BlockFaceData::FACE_OFFSETS)

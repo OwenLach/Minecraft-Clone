@@ -15,7 +15,7 @@ World::World(Camera &camera)
     : camera_(camera),
       pipeline_(),
       chunkManager_(camera),
-      lightSystem_(),
+      lightSystem_(this),
       lastPlayerChunk_(worldToChunkCoords(glm::ivec3(camera_.Position - glm::vec3(1)))),
       raycaster(*this, camera)
 {
@@ -223,6 +223,13 @@ glm::ivec3 World::getBlockLocalPosition(glm::ivec3 worldPos) const
     int localY = worldPos.y;
     int localZ = (worldPos.z % Constants::CHUNK_SIZE_Z + Constants::CHUNK_SIZE_Z) % Constants::CHUNK_SIZE_Z;
     return glm::ivec3(localX, localY, localZ);
+}
+
+glm::ivec3 World::localToGlobalPos(ChunkCoord chunkCoords, glm::ivec3 localPos) const
+{
+    return glm::ivec3(chunkCoords.x * Constants::CHUNK_SIZE_X + localPos.x,
+                      localPos.y,
+                      chunkCoords.z * Constants::CHUNK_SIZE_Z + localPos.z);
 }
 
 Block World::getBlockGlobal(glm::vec3 worldPos) const

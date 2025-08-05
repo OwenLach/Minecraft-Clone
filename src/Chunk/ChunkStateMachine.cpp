@@ -16,6 +16,14 @@ bool ChunkStateMachine::canTransitionTo(ChunkState newState) const
                newState == ChunkState::UNLOADING;
 
     case ChunkState::TERRAIN_READY:
+        return newState == ChunkState::LIGHT_PROPOGATING ||
+               newState == ChunkState::UNLOADING;
+
+    case ChunkState::LIGHT_PROPOGATING:
+        return newState == ChunkState::LIGHT_READY ||
+               newState == ChunkState::UNLOADING;
+
+    case ChunkState::LIGHT_READY:
         return newState == ChunkState::MESH_GENERATING ||
                newState == ChunkState::UNLOADING;
 
@@ -63,6 +71,7 @@ bool ChunkStateMachine::isProcessing() const
 {
     ChunkState state = currentState_.load();
     return state == ChunkState::TERRAIN_GENERATING ||
+           state == ChunkState::LIGHT_PROPOGATING ||
            state == ChunkState::MESH_GENERATING ||
            state == ChunkState::UNLOADING;
 }
@@ -87,6 +96,10 @@ const char *ChunkStateMachine::toString(ChunkState state)
         return "TERRAIN_GENERATING";
     case ChunkState::TERRAIN_READY:
         return "TERRAIN_READY";
+    case ChunkState::LIGHT_PROPOGATING:
+        return "LIGHT PROPOGATING";
+    case ChunkState::LIGHT_READY:
+        return "LIGHT READY";
     case ChunkState::MESH_GENERATING:
         return "MESH_GENERATING";
     case ChunkState::MESH_READY:
