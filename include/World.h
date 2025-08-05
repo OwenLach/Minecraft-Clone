@@ -28,6 +28,7 @@ public:
     void setPlayerBlockType(BlockType type);
 
     bool isBlockSolid(glm::ivec3 blockWorldPos) const;
+    glm::ivec3 localToGlobalPos(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
 
 private:
     Camera &camera_;

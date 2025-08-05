@@ -54,23 +54,20 @@ public:
 
     const ChunkCoord getCoord() const;
     const BoundingBox getBoundingBox() const;
-    const Block &getBlockLocal(const glm::ivec3 &pos) const;
+    Block &getBlockLocal(const glm::ivec3 &pos);
 
     void configureVertexAttributes();
 
 private:
     // ---- Core Data ------
     std::vector<Block> blocks_;
-
     ChunkMesh mesh_;
     ChunkStateMachine stateMachine_;
     ChunkCoord chunkCoord_;
     BoundingBox boundingBox_;
     TerrainGenerator terrainGen_;
-
-    glm::mat4 modelMatrix_;
-
     TextureAtlas &textureAtlas_;
+    glm::mat4 modelMatrix_;
 
     VertexArray vao_;
     VertexBuffer vbo_;
@@ -82,6 +79,6 @@ private:
     BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset, std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
     inline bool blockInChunkBounds(const glm::ivec3 &pos) const;
     inline bool isTransparent(BlockType type) const;
-    bool isBlockHidden(const glm::ivec3 &pos);
+    bool isBlockHiddenByNeighbors(const glm::ivec3 &pos);
     inline size_t getBlockIndex(const glm::ivec3 &pos) const;
 };

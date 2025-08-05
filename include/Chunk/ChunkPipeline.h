@@ -9,6 +9,8 @@ class Chunk;
 class ChunkManager;
 class LightSystem;
 
+// Responsible for handling the whole chunk pipeline process
+// Generate terrain -> Propogate light -> Mesh -> Upload to GPU -> Handle remeshing
 class ChunkPipeline
 {
 public:
@@ -17,7 +19,7 @@ public:
     // Terrain Gen
     void generateTerrain(std::shared_ptr<Chunk> chunk);
     // Lighting
-
+    void propogateLight(std::shared_ptr<Chunk> chunk);
     // Meshing
     void queueInitialMesh(std::shared_ptr<Chunk> chunk);
     void queueRemesh(std::shared_ptr<Chunk> chunk);

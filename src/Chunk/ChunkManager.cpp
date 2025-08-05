@@ -27,6 +27,7 @@ void ChunkManager::init(ChunkPipeline *pipeline)
 void ChunkManager::addChunk(const ChunkCoord &coord)
 {
     auto chunk = std::make_shared<Chunk>(chunkShader_, textureAtlas_, coord);
+    chunk->setState(ChunkState::TERRAIN_GENERATING);
     pipeline_->generateTerrain(chunk);
 
     std::unique_lock<std::shared_mutex> lock(loadedChunksMutex_);
@@ -49,15 +50,21 @@ void ChunkManager::update()
 
         ChunkState state = chunk->getState();
 
+        // Scan for chunks that are ready for light propogation
         if (state == ChunkState::TERRAIN_READY && allNeighborsTerrainReady(pos))
+        {
+            // IMPORTANT: Set state immediately to prevent re-queueing
+            chunk->setState(ChunkState::LIGHT_PROPOGATING);
+            pipeline_->propogateLight(chunk);
+        }
+        // Scan for chunks ready for initail mesh generation
+        else if (state == ChunkState::LIGHT_READY && allNeighborsLightReady(pos))
         {
             // IMPORTANT: Set state immediately to prevent re-queueing
             chunk->setState(ChunkState::MESH_GENERATING);
             pipeline_->queueInitialMesh(chunk);
-
-            // chunk->setState(ChunkState::LIGHT_PROPOGATING);
-            // pipeline_->propogateLight(chunk);
         }
+        // Scan for chunks that need a remesh
         else if (state == ChunkState::NEEDS_MESH_REGEN && allNeighborsTerrainReady(pos))
         {
             chunk->setState(ChunkState::MESH_GENERATING);
@@ -164,7 +171,16 @@ bool ChunkManager::allNeighborsTerrainReady(const ChunkCoord &coord)
     return true;
 }
 
-// Shader &ChunkManager::getChunkShader() const
-// {
-//     return chunkShader_;
-// }
+bool ChunkManager::allNeighborsLightReady(const ChunkCoord &coord)
+{
+    auto neighbors = getChunkNeighbors(coord);
+
+    for (auto &n_chunkPtr : neighbors)
+    {
+        if (!n_chunkPtr || n_chunkPtr->getState() < ChunkState::LIGHT_READY)
+        {
+            return false;
+        }
+    }
+    return true;
+}
