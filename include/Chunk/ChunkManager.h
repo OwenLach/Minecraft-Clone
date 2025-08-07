@@ -30,6 +30,7 @@ public:
     void render();
     void update();
 
+    const TextureAtlas &getTextureAtlasRef() const;
     std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> getLoadedChunksCopy() const;
     const std::shared_ptr<Chunk> getChunk(const ChunkCoord &coord) const;
     std::array<std::shared_ptr<Chunk>, 4> getChunkNeighbors(const ChunkCoord &coord);

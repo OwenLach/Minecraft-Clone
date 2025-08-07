@@ -24,6 +24,7 @@
 
 class ChunkManager;
 class ChunkPipeline;
+class MeshData;
 
 struct BoundingBox
 {
@@ -37,13 +38,13 @@ class Chunk : public std::enable_shared_from_this<Chunk>
 public:
     Chunk(Shader &shader, TextureAtlas &atlas, ChunkCoord pos);
 
-    // --- Core Methods ---
+    // Core methods
     void render();
     void generateTerrain();
-    void generateMesh(std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
-    void uploadMeshToGPU();
+
+    // Operate on own block data
     void removeBlockAt(glm::ivec3 pos);
-    void placeBlockAt(glm::ivec3 pos, BlockType type);
+    void setBlockAt(glm::ivec3 pos, BlockType type);
 
     // State
     ChunkState getState() const;
@@ -52,11 +53,20 @@ public:
     bool isProcessing();
     bool canRemesh();
 
+    // Getters/Setters
+    ChunkMesh &getMesh();
+    void setMeshData(MeshData &newMeshData);
     const ChunkCoord getCoord() const;
     const BoundingBox getBoundingBox() const;
+    const TextureAtlas &getTextureAtlasRef() const;
     Block &getBlockLocal(const glm::ivec3 &pos);
 
-    void configureVertexAttributes();
+    inline bool blockPosInChunkBounds(const glm::ivec3 &pos) const
+    {
+        return pos.x >= 0 && pos.x < Constants::CHUNK_SIZE_X &&
+               pos.y >= 0 && pos.y < Constants::CHUNK_SIZE_Y &&
+               pos.z >= 0 && pos.z < Constants::CHUNK_SIZE_Z;
+    }
 
 private:
     // ---- Core Data ------
@@ -69,16 +79,5 @@ private:
     TextureAtlas &textureAtlas_;
     glm::mat4 modelMatrix_;
 
-    VertexArray vao_;
-    VertexBuffer vbo_;
-    ElementBuffer ebo_;
-
-    void generateBlockMesh(const Block &block, const std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
-    void generateFaceVertices(const Block &block, BlockFaces face, const std::function<BlockType(int, int, int)> &getCachedNeighbor);
-
-    BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset, std::array<std::shared_ptr<Chunk>, 4> neighborChunks);
-    inline bool blockInChunkBounds(const glm::ivec3 &pos) const;
-    inline bool isTransparent(BlockType type) const;
-    bool isBlockHiddenByNeighbors(const glm::ivec3 &pos);
     inline size_t getBlockIndex(const glm::ivec3 &pos) const;
 };

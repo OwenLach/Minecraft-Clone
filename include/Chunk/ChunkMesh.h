@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Chunk/Vertex.h"
+#include "Chunk/MeshData.h"
 #include "OpenGL/VertexArray.h"
 #include "OpenGL/VertexBuffer.h"
 #include "OpenGL/ElementBuffer.h"
@@ -15,8 +16,7 @@ class Shader;
 class ChunkMesh
 {
 public:
-    std::vector<Vertex> vertices_;
-    std::vector<unsigned int> indices_;
+    MeshData meshData_;
     size_t verticesCount_ = 0;
     size_t indicesCount_ = 0;
     std::atomic<bool> hasValidMesh_{false};

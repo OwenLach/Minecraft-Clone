@@ -96,7 +96,7 @@ void World::placeBlock()
         auto chunk = chunkManager_.getChunk(worldToChunkCoords(posToPlace));
         if (chunk)
         {
-            chunk->placeBlockAt(getBlockLocalPosition(posToPlace), playerBlockType_);
+            chunk->setBlockAt(getBlockLocalPosition(posToPlace), playerBlockType_);
             chunk->setState(ChunkState::NEEDS_MESH_REGEN);
             chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
         }

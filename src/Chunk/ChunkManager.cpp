@@ -92,7 +92,13 @@ void ChunkManager::render()
     }
 }
 
+const TextureAtlas &ChunkManager::getTextureAtlasRef() const
+{
+    return textureAtlas_;
+}
+
 std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> ChunkManager::getLoadedChunksCopy() const
+
 {
     std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
     return loadedChunks_;

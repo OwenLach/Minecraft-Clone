@@ -68,7 +68,7 @@ void TextureAtlas::initBlockUVs()
     }
 }
 
-const std::array<glm::vec2, 4> &TextureAtlas::getBlockFaceUVs(BlockType type, BlockFaces face)
+const std::array<glm::vec2, 4> &TextureAtlas::getBlockFaceUVs(BlockType type, BlockFaces face) const
 {
     const auto &blockUVs = blockUVsMap_.at(type);
 
