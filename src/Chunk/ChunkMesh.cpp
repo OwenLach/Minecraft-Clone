@@ -14,8 +14,8 @@ ChunkMesh::ChunkMesh(Shader &chunkShader) : chunkShader_(chunkShader)
     const int chunkSize_Y = Constants::CHUNK_SIZE_Y;
     const int chunkSize_Z = Constants::CHUNK_SIZE_Z;
 
-    vertices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 4); // Max 4 unique vertices per face
-    indices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 6);  // Max 6 indices per face
+    meshData_.vertices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 4); // Max 4 unique vertices per face
+    meshData_.indices_.reserve(chunkSize_X * chunkSize_Y * chunkSize_Z * 6);  // Max 6 indices per face
 
     configureVertexAttributes();
 }
@@ -34,7 +34,7 @@ void ChunkMesh::render(const ChunkCoord &coord)
 
 void ChunkMesh::uploadMesh()
 {
-    if (vertices_.empty() || indices_.empty())
+    if (meshData_.vertices_.empty() || meshData_.indices_.empty())
     {
         std::cout << "TRIED TO UPLOAD EMPTY MESH" << std::endl;
         return;
@@ -44,16 +44,16 @@ void ChunkMesh::uploadMesh()
 
     // Bind vertex buffer and set data
     vbo_.bind();
-    verticesCount_ = vertices_.size();
-    vbo_.setData(reinterpret_cast<const float *>(vertices_.data()), verticesCount_ * sizeof(Vertex));
+    verticesCount_ = meshData_.vertices_.size();
+    vbo_.setData(reinterpret_cast<const float *>(meshData_.vertices_.data()), verticesCount_ * sizeof(Vertex));
 
     // Bind index buffer and set data
     ebo_.bind();
-    indicesCount_ = indices_.size();
-    ebo_.setData(indices_.data(), indicesCount_ * sizeof(unsigned int));
+    indicesCount_ = meshData_.indices_.size();
+    ebo_.setData(meshData_.indices_.data(), indicesCount_ * sizeof(unsigned int));
 
-    vertices_.clear();
-    indices_.clear();
+    meshData_.vertices_.clear();
+    meshData_.indices_.clear();
 }
 
 void ChunkMesh::setMeshValid()

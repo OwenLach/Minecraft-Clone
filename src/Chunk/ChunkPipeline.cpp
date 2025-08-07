@@ -1,6 +1,7 @@
 #include "Chunk/ChunkPipeline.h"
 #include "Chunk/ChunkStateMachine.h"
 #include "Chunk/ChunkManager.h"
+#include "Chunk/ChunkMeshBuilder.h"
 #include "Chunk/Chunk.h"
 #include "LightSystem.h"
 
@@ -86,7 +87,14 @@ void ChunkPipeline::generateMesh(std::shared_ptr<Chunk> chunk)
         if (!chunk)
             return;
 
-        chunk->generateMesh(chunkManager_->getChunkNeighbors(chunk->getCoord()));
+        MeshData emptyMeshData;
+        auto neighbors = chunkManager_->getChunkNeighbors(chunk->getCoord());
+        const TextureAtlas &atlas = chunkManager_->getTextureAtlasRef();
+
+        ChunkMeshBuilder builder(emptyMeshData, atlas, chunk, neighbors);
+        MeshData &newMeshData = builder.buildMesh();
+
+        chunk->setMeshData(newMeshData);
         chunk->setState(ChunkState::MESH_READY);
         {
             std::lock_guard<std::mutex> lock(uploadMutex_);
@@ -122,5 +130,5 @@ void ChunkPipeline::processGPUUploads()
 void ChunkPipeline::uploadMeshToGPU(std::shared_ptr<Chunk> chunk)
 {
     chunk->setState(ChunkState::LOADED);
-    chunk->uploadMeshToGPU();
+    chunk->getMesh().uploadMesh();
 }

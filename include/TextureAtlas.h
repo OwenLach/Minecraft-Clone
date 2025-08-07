@@ -15,7 +15,7 @@ public:
 
     TextureAtlas();
     void bindUnit(unsigned int unit);
-    const std::array<glm::vec2, 4> &getBlockFaceUVs(BlockType type, BlockFaces face);
+    const std::array<glm::vec2, 4> &getBlockFaceUVs(BlockType type, BlockFaces face) const;
 
 private:
     int atlasWidth_;
