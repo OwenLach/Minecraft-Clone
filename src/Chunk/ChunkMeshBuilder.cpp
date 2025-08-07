@@ -3,6 +3,7 @@
 #include "Chunk/MeshData.h"
 #include "Block/BlockFaceData.h"
 #include "Constants.h"
+#include "TextureAtlas.h"
 
 #include <glm/glm.hpp>
 #include <iostream>

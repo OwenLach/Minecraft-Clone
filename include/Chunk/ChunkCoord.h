@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <cstddef>
+
 struct ChunkCoord
 {
     int x;

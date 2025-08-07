@@ -16,6 +16,7 @@ class Camera;
 class Shader;
 class TextureAtlas;
 
+// Owns all the systems/managers
 class World
 {
 public:
@@ -32,7 +33,6 @@ public:
 
 private:
     Camera &camera_;
-    // Owns all the systems/managers
     ChunkPipeline pipeline_;
     ChunkManager chunkManager_;
     LightSystem lightSystem_;
