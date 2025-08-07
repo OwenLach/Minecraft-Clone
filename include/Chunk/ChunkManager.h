@@ -27,7 +27,8 @@ public:
     void init(ChunkPipeline *pipeline);
     void addChunk(const ChunkCoord &coord);
     void removeChunk(const ChunkCoord &coord);
-    void render();
+    void renderAllChunks();
+    void renderChunk(std::shared_ptr<Chunk> chunk, const ChunkCoord &pos);
     void update();
 
     const TextureAtlas &getTextureAtlasRef() const;

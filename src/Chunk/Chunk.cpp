@@ -1,21 +1,12 @@
 #include "Chunk/Chunk.h"
-#include "Chunk/ChunkManager.h"
-#include "Chunk/ChunkPipeline.h"
 #include "Block/BlockTypes.h"
-#include "FastNoiseLite.h"
-#include "Performance/ScopedTimer.h"
 #include "Block/BlockFaceData.h"
+#include "Performance/ScopedTimer.h"
 
-#include <glad/glad.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
-#include <array>
 #include <vector>
-#include <cmath>
-#include <functional>
 
 Chunk::Chunk(Shader &chunkShader, TextureAtlas &atlas, ChunkCoord pos)
     : mesh_(chunkShader), textureAtlas_(atlas), chunkCoord_(pos)
@@ -28,12 +19,6 @@ Chunk::Chunk(Shader &chunkShader, TextureAtlas &atlas, ChunkCoord pos)
 
     boundingBox_.min = glm::vec3(chunkCoord_.x * chunkSize_X, 0, chunkCoord_.z * chunkSize_Z);
     boundingBox_.max = glm::vec3(chunkCoord_.x * chunkSize_X + chunkSize_X, chunkSize_Y, chunkCoord_.z * chunkSize_Z + chunkSize_Z);
-}
-
-void Chunk::render()
-{
-    if (mesh_.hasValidMesh_)
-        mesh_.render(chunkCoord_);
 }
 
 void Chunk::generateTerrain()

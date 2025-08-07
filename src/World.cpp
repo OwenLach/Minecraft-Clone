@@ -39,7 +39,7 @@ void World::update()
 
 void World::render()
 {
-    chunkManager_.render();
+    chunkManager_.renderAllChunks();
 
     if (hasTargetBlock_)
     {

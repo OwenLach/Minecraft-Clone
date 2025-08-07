@@ -76,10 +76,9 @@ void ChunkManager::update()
     pipeline_->processGPUUploads();
 }
 
-void ChunkManager::render()
+void ChunkManager::renderAllChunks()
 {
     textureAtlas_.bindUnit(0);
-
     chunkShader_.use();
     chunkShader_.setMat4("projection", camera_.getProjectionMatrix());
     chunkShader_.setMat4("view", camera_.getViewMatrix());
@@ -88,8 +87,15 @@ void ChunkManager::render()
     for (auto &[pos, chunk] : loadedChunks_)
     {
         if (camera_.isAABBInFrustum(chunk->getBoundingBox()))
-            chunk->render();
+            renderChunk(chunk, pos);
     }
+}
+
+void ChunkManager::renderChunk(std::shared_ptr<Chunk> chunk, const ChunkCoord &pos)
+{
+    ChunkMesh &mesh = chunk->getMesh();
+    if (mesh.hasValidMesh_)
+        mesh.render(pos);
 }
 
 const TextureAtlas &ChunkManager::getTextureAtlasRef() const
