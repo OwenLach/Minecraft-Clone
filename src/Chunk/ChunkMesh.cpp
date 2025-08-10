@@ -71,6 +71,7 @@ void ChunkMesh::configureVertexAttributes()
     layout.push<float>(3); // position
     layout.push<float>(2); // texture coords
     layout.push<float>(1); // AO
+    layout.push<float>(1); // Light
     vao_.addBuffer(vbo_, layout);
 
     GLenum error = glGetError();

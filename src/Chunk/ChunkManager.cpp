@@ -10,7 +10,6 @@
 #include <iostream>
 #include <thread>
 #include <algorithm>
-#include <iostream>
 
 ChunkManager::ChunkManager(Camera &camera)
     : camera_(camera),
@@ -67,7 +66,7 @@ void ChunkManager::update()
         // Scan for chunks that need a remesh
         else if (state == ChunkState::NEEDS_MESH_REGEN && allNeighborsTerrainReady(pos))
         {
-            chunk->setState(ChunkState::MESH_GENERATING);
+            chunk->setState(ChunkState::LIGHT_PROPOGATING);
             pipeline_->queueRemesh(chunk);
         }
     }
