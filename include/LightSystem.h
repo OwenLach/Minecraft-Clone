@@ -9,8 +9,10 @@ class LightSystem
 {
 public:
     LightSystem(World *world);
-    void propogateSkylight(std::shared_ptr<Chunk> chunk);
+    void propagateSkylight(std::shared_ptr<Chunk> chunk);
 
 private:
     World *world_;
+
+    void clearChunkLightLevels(std::shared_ptr<Chunk> chunk);
 };

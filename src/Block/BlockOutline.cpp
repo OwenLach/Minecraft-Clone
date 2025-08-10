@@ -9,7 +9,6 @@ BlockOutline::BlockOutline()
 {
     createShader();
     configureVertexAttributes();
-    std::cout << "Block Outline Shader and vertex attributes initialized" << std::endl;
 }
 
 void BlockOutline::render(const glm::mat4 &view, const glm::mat4 &projection, const glm::vec3 &blockPosition)

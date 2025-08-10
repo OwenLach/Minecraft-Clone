@@ -43,15 +43,15 @@ MeshData &ChunkMeshBuilder::buildMesh()
 void ChunkMeshBuilder::generateBlockMesh(Block &block)
 {
     // ================NEIGHBOR CACHING===================================
-    BlockType cache[27];
+    Block *cache[27];
     for (int i = 0; i < 27; i++)
     {
         glm::ivec3 offset = glm::ivec3(i % 3 - 1, (i / 3) % 3 - 1, i / 9 - 1);
-        cache[i] = getNeighborBlockType(block.position, offset);
+        cache[i] = getNeighborBlock(block.position, offset);
     }
 
     // Helper to get neighbor from cache
-    auto getNeighborTypeFromCache = [&](int x, int y, int z)
+    auto getNeighborPtrFromCache = [&](int x, int y, int z) -> Block *
     {
         // Convert offset from [-1, 1] to [0, 2] for array indexing
         return cache[(x + 1) + (y + 1) * 3 + (z + 1) * 9];
@@ -61,12 +61,18 @@ void ChunkMeshBuilder::generateBlockMesh(Block &block)
     for (int f = 0; f < 6; f++)
     {
         const auto offset = BlockFaceData::FACE_OFFSETS[f];
-        if (isTransparent(getNeighborTypeFromCache(offset.x, offset.y, offset.z)))
-            generateFaceMesh(block, static_cast<BlockFaces>(f), getNeighborTypeFromCache);
+        Block *neighborBlockPtr = getNeighborPtrFromCache(offset.x, offset.y, offset.z);
+
+        // If the neighbor adjacent the curr block face is transparent or is missing, generate the mesh for the face
+        if (!neighborBlockPtr || isTransparent(neighborBlockPtr->type))
+        {
+            uint8_t nLight = neighborBlockPtr ? neighborBlockPtr->skylight : 0;
+            generateFaceMesh(block, nLight, static_cast<BlockFaces>(f), getNeighborPtrFromCache);
+        }
     }
 }
 
-void ChunkMeshBuilder::generateFaceMesh(Block &block, BlockFaces face, const std::function<BlockType(int, int, int)> &getNeighborTypeFromCache)
+void ChunkMeshBuilder::generateFaceMesh(Block &block, uint8_t adjacentBlockSkylight, BlockFaces face, const std::function<Block *(int, int, int)> &getNeighborPtrFromCache)
 {
     // std::cout << "Light value for block: " << static_cast<float>(block.skylight) / 15.0f << std::endl;
     const auto &faceUVs = textureAtlas_.getBlockFaceUVs(block.type, face);
@@ -76,18 +82,21 @@ void ChunkMeshBuilder::generateFaceMesh(Block &block, BlockFaces face, const std
     // ao helper function
     auto computeAO = [&](const std::array<glm::ivec3, 3> &offsets)
     {
-        bool side1 = !isTransparent(getNeighborTypeFromCache(offsets[0].x, offsets[0].y, offsets[0].z));
-        bool side2 = !isTransparent(getNeighborTypeFromCache(offsets[1].x, offsets[1].y, offsets[1].z));
-        bool corner = !isTransparent(getNeighborTypeFromCache(offsets[2].x, offsets[2].y, offsets[2].z));
+        Block *n0 = getNeighborPtrFromCache(offsets[0].x, offsets[0].y, offsets[0].z);
+        Block *n1 = getNeighborPtrFromCache(offsets[1].x, offsets[1].y, offsets[1].z);
+        Block *n2 = getNeighborPtrFromCache(offsets[2].x, offsets[2].y, offsets[2].z);
+
+        bool side1 = (n0 && !isTransparent(n0->type));
+        bool side2 = (n1 && !isTransparent(n1->type));
+        bool corner = (n2 && !isTransparent(n2->type));
 
         if (side1 && side2)
-        {
             return 0.3f; // Darkest
-        }
         int occlusion = side1 + side2 + corner;
         return 1.0f - occlusion * 0.2f; // Simple mapping: 1.0, 0.8, 0.6, 0.4
     };
 
+    // Calculate Skylight for Face
     unsigned int baseVertexIndex = static_cast<unsigned int>(meshData_.vertices_.size());
     // Make vertex for each corner of face
     for (int i = 0; i < 4; i++)
@@ -96,8 +105,8 @@ void ChunkMeshBuilder::generateFaceMesh(Block &block, BlockFaces face, const std
         v.position = corners[i] + glm::vec3(block.position);
         v.textureCoords = faceUVs[i];
         v.ao = computeAO(aoData[i]);
-        // // Skylight = 0-15, so normalize to [0 - 1] for OpenGL
-        // v.light = static_cast<float>(block.skylight) / 15.0f;
+        // Skylight = 0-15, so normalize to [0 - 1] for OpenGL
+        v.light = static_cast<float>(adjacentBlockSkylight) / 15.0f;
         meshData_.vertices_.push_back(v);
     }
 
@@ -107,7 +116,7 @@ void ChunkMeshBuilder::generateFaceMesh(Block &block, BlockFaces face, const std
     }
 }
 
-BlockType ChunkMeshBuilder::getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset)
+Block *ChunkMeshBuilder::getNeighborBlock(const glm::ivec3 blockPos, const glm::ivec3 offset)
 {
     const auto northChunk = neighborChunks_[0];
     const auto southChunk = neighborChunks_[1];
@@ -119,13 +128,11 @@ BlockType ChunkMeshBuilder::getNeighborBlockType(const glm::ivec3 blockPos, cons
     // if it's in the chunk, just get it
     if (chunk_->blockPosInChunkBounds(neighborLocalPos))
     {
-        return chunk_->getBlockLocal(neighborLocalPos).type;
+        return &chunk_->getBlockLocal(neighborLocalPos);
     }
     else
     {
-        // Check which chunk block is in
-        // Determine which neighboring chunk the block falls into and get its local coordinates
-
+        // Determine which neighboring chunk the block falls into
         if (neighborLocalPos.x < 0 &&
             neighborLocalPos.z >= 0 && neighborLocalPos.z < Constants::CHUNK_SIZE_Z &&
             neighborLocalPos.y >= 0 && neighborLocalPos.y < Constants::CHUNK_SIZE_Y)
@@ -133,7 +140,7 @@ BlockType ChunkMeshBuilder::getNeighborBlockType(const glm::ivec3 blockPos, cons
             if (westChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x + Constants::CHUNK_SIZE_X, neighborLocalPos.y, neighborLocalPos.z};
-                return westChunk->getBlockLocal(localPosInNeighbor).type;
+                return &westChunk->getBlockLocal(localPosInNeighbor);
             }
         }
         // Check East neighbor (+X direction)
@@ -144,7 +151,7 @@ BlockType ChunkMeshBuilder::getNeighborBlockType(const glm::ivec3 blockPos, cons
             if (eastChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x - Constants::CHUNK_SIZE_X, neighborLocalPos.y, neighborLocalPos.z};
-                return eastChunk->getBlockLocal(localPosInNeighbor).type;
+                return &eastChunk->getBlockLocal(localPosInNeighbor);
             }
         }
         // Check South neighbor (-Z direction)
@@ -155,7 +162,7 @@ BlockType ChunkMeshBuilder::getNeighborBlockType(const glm::ivec3 blockPos, cons
             if (southChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z + Constants::CHUNK_SIZE_Z};
-                return southChunk->getBlockLocal(localPosInNeighbor).type;
+                return &southChunk->getBlockLocal(localPosInNeighbor);
             }
         }
         // Check North neighbor (+Z direction)
@@ -166,12 +173,12 @@ BlockType ChunkMeshBuilder::getNeighborBlockType(const glm::ivec3 blockPos, cons
             if (northChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z - Constants::CHUNK_SIZE_Z};
-                return northChunk->getBlockLocal(localPosInNeighbor).type;
+                return &northChunk->getBlockLocal(localPosInNeighbor);
             }
         }
 
-        // Fallback
-        return BlockType::Air;
+        // block not found
+        return nullptr;
     }
 }
 

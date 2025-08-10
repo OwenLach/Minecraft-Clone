@@ -28,6 +28,7 @@ public:
     void placeBlock();
     void setPlayerBlockType(BlockType type);
 
+    Block *getBlockGlobal(const glm::ivec3 worldPos) const;
     bool isBlockSolid(glm::ivec3 blockWorldPos) const;
     glm::ivec3 localToGlobalPos(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
 
@@ -52,7 +53,6 @@ private:
     ChunkCoord worldToChunkCoords(glm::ivec3 worldCoords) const;
 
     // Block helper
-    Block getBlockGlobal(glm::vec3 worldPos) const;
     Block getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos);
     glm::ivec3 getBlockLocalPosition(glm::ivec3 worldPos) const;
 

@@ -166,21 +166,26 @@ void World::updateSelectedBlockOutline()
     {
         // Global hit position
         auto blockHitPos = raycaster.getHitBlockPosition();
-        Block block = getBlockGlobal(blockHitPos);
-        // std::cout << "Block Hit for outline" << std::endl;
+        Block *blockPtr = getBlockGlobal(blockHitPos);
 
+        if (!blockPtr)
+        {
+            throw std::runtime_error("Block not found at " +
+                                     std::to_string(blockHitPos.x) + ", " +
+                                     std::to_string(blockHitPos.y) + ", " +
+                                     std::to_string(blockHitPos.z));
+        }
+
+        Block &block = *blockPtr;
         if (block.type != BlockType::Air)
         {
-
             targetBlockPos_ = blockHitPos;
-            // std::cout << "setting hasTargetBlock_ to true" << std::endl;
             hasTargetBlock_ = true;
         }
     }
     // Only set it false if its true
     else if (hasTargetBlock_)
     {
-        // std::cout << "setting hasTargetBlock_ to false" << std::endl;
         hasTargetBlock_ = false;
     }
 }
@@ -232,27 +237,25 @@ glm::ivec3 World::localToGlobalPos(ChunkCoord chunkCoords, glm::ivec3 localPos) 
                       chunkCoords.z * Constants::CHUNK_SIZE_Z + localPos.z);
 }
 
-Block World::getBlockGlobal(glm::vec3 worldPos) const
+Block *World::getBlockGlobal(const glm::ivec3 worldPos) const
 {
-    glm::ivec3 worldCoords = glm::ivec3(glm::floor(worldPos));
 
-    // glm::ivec3 localBlockPos = glm::ivec3(localX, localY, localZ);
-    auto localBlockPos = getBlockLocalPosition(worldCoords);
-    ChunkCoord chunkCoord = worldToChunkCoords(worldCoords);
+    auto localBlockPos = getBlockLocalPosition(worldPos);
+    ChunkCoord chunkCoord = worldToChunkCoords(worldPos);
     auto chunkPtr = chunkManager_.getChunk(chunkCoord);
     if (chunkPtr)
     {
-        return chunkPtr->getBlockLocal(localBlockPos);
+        return &chunkPtr->getBlockLocal(localBlockPos);
     }
     else
     {
-        // return a default air block if chunk isn't found
-        return Block(BlockType::Air, glm::ivec3(0));
+        // return a nullptr if chunk isn't found
+        return nullptr;
     }
 }
 
 bool World::isBlockSolid(glm::ivec3 blockWorldPos) const
 {
-    Block block = getBlockGlobal(glm::vec3(blockWorldPos));
-    return block.type != BlockType::Air;
+    Block *block = getBlockGlobal(blockWorldPos);
+    return block->type != BlockType::Air;
 }

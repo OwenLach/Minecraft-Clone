@@ -26,9 +26,9 @@ private:
     const TextureAtlas &textureAtlas_;
 
     void generateBlockMesh(Block &block);
-    void generateFaceMesh(Block &block, BlockFaces face, const std::function<BlockType(int, int, int)> &getCachedNeighbor);
+    void generateFaceMesh(Block &block, uint8_t adjacentBlockSkylight, BlockFaces face, const std::function<Block *(int, int, int)> &getNeighborPtrFromCache);
 
-    BlockType getNeighborBlockType(const glm::ivec3 blockPos, const glm::ivec3 offset);
+    Block *getNeighborBlock(const glm::ivec3 blockPos, const glm::ivec3 offset);
     bool isBlockHiddenByNeighbors(const glm::ivec3 &pos);
     inline bool isTransparent(BlockType type) const;
 };
