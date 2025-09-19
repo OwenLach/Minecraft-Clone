@@ -32,6 +32,12 @@ public:
     bool isBlockSolid(glm::ivec3 blockWorldPos) const;
     glm::ivec3 localToGlobalPos(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
 
+    const std::shared_ptr<Chunk> getChunk(const ChunkCoord &coord) const;
+    // Coordinate conversions
+    glm::ivec3 chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
+    ChunkCoord worldToChunkCoords(glm::ivec3 worldCoords) const;
+    glm::ivec3 getBlockLocalPosition(glm::ivec3 worldPos) const;
+
 private:
     Camera &camera_;
     ChunkPipeline pipeline_;
@@ -47,14 +53,6 @@ private:
     void loadNewChunks(ChunkCoord center);
     void unloadDistantChunks();
     void updateSelectedBlockOutline();
-
-    // Coordinate conversions
-    glm::ivec3 chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const;
-    ChunkCoord worldToChunkCoords(glm::ivec3 worldCoords) const;
-
-    // Block helper
-    Block getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos);
-    glm::ivec3 getBlockLocalPosition(glm::ivec3 worldPos) const;
 
     static inline bool isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
     {

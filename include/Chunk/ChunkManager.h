@@ -31,8 +31,22 @@ public:
     void renderChunk(std::shared_ptr<Chunk> chunk, const ChunkCoord &pos);
     void update();
 
+    // Use visitor pattern
+    template <typename Visitor>
+    void forEachChunk(Visitor &&v)
+    {
+        // Lock first
+        std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+        // Apply visitor function, lambda, ect.. on each coord, chunk pair
+        for (const auto [coord, chunk] : loadedChunks_)
+        {
+            if (!chunk)
+                continue;
+            v(coord, chunk);
+        }
+    }
+    const std::array<std::shared_ptr<Chunk>, 4> getChunkNeighborsFromCache(const ChunkCoord &center);
     const TextureAtlas &getTextureAtlasRef() const;
-    std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> getLoadedChunksCopy() const;
     const std::shared_ptr<Chunk> getChunk(const ChunkCoord &coord) const;
     std::array<std::shared_ptr<Chunk>, 4> getChunkNeighbors(const ChunkCoord &coord);
     void markNeighborsForMeshRegeneration(const ChunkCoord &coord);
@@ -45,6 +59,12 @@ private:
 
     std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks_;
     mutable std::shared_mutex loadedChunksMutex_;
+
+    std::unordered_map<ChunkCoord, std::array<std::weak_ptr<Chunk>, 4>> neighborCache_;
+    std::mutex cacheMutex_;
+
+    void processLighting();
+    void processMeshing();
 
     bool allNeighborsTerrainReady(const ChunkCoord &coord);
     bool allNeighborsLightReady(const ChunkCoord &coord);

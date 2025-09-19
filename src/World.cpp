@@ -15,7 +15,7 @@ World::World(Camera &camera)
     : camera_(camera),
       pipeline_(),
       chunkManager_(camera),
-      lightSystem_(this),
+      lightSystem_(this, &chunkManager_),
       lastPlayerChunk_(worldToChunkCoords(glm::ivec3(camera_.Position - glm::vec3(1)))),
       raycaster(*this, camera)
 {
@@ -56,8 +56,7 @@ void World::breakBlock()
         if (chunk)
         {
             chunk->removeBlockAt(getBlockLocalPosition(blockHitPos));
-            chunk->setState(ChunkState::NEEDS_MESH_REGEN);
-            chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
+            chunk->setState(ChunkState::NEEDS_LIGHT_UPDATE);
         }
     }
 }
@@ -97,8 +96,8 @@ void World::placeBlock()
         if (chunk)
         {
             chunk->setBlockAt(getBlockLocalPosition(posToPlace), playerBlockType_);
-            chunk->setState(ChunkState::NEEDS_MESH_REGEN);
-            chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
+            chunk->setState(ChunkState::NEEDS_LIGHT_UPDATE);
+            // chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
         }
     }
 }
@@ -145,15 +144,13 @@ void World::unloadDistantChunks()
     const ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera_.Position));
     std::vector<ChunkCoord> chunkCoordsToRemove;
 
-    for (const auto &[pos, chunk] : chunkManager_.getLoadedChunksCopy())
-    {
-        // if chunk is in the middle of processing anything, don't unload
-        if (!isInRenderDistance(pos.x, pos.z, playerPos.x, playerPos.z) && chunk->canUnload())
-        {
-            chunkCoordsToRemove.push_back(pos);
-        }
-    }
+    // Pass to chunkManagers visitor function which checks if every coord/chunk pair
+    chunkManager_.forEachChunk([&](const ChunkCoord coord, std::shared_ptr<Chunk> chunk) { //
+        if (!isInRenderDistance(coord.x, coord.z, playerPos.x, playerPos.z) && chunk->canUnload())
+            chunkCoordsToRemove.push_back(coord);
+    });
 
+    // Remove chunks outside of lock
     for (const auto &coord : chunkCoordsToRemove)
     {
         chunkManager_.removeChunk(coord);
@@ -190,6 +187,11 @@ void World::updateSelectedBlockOutline()
     }
 }
 
+const std::shared_ptr<Chunk> World::getChunk(const ChunkCoord &coord) const
+{
+    return chunkManager_.getChunk(coord);
+}
+
 glm::ivec3 World::chunkToWorldCoords(ChunkCoord chunkCoords, glm::ivec3 localPos) const
 {
     int x = chunkCoords.x * Constants::CHUNK_SIZE_X + localPos.x;
@@ -203,17 +205,6 @@ ChunkCoord World::worldToChunkCoords(glm::ivec3 worldCoords) const
     int chunkX = glm::floor(worldCoords.x / (float)Constants::CHUNK_SIZE_X);
     int chunkZ = glm::floor(worldCoords.z / (float)Constants::CHUNK_SIZE_Z);
     return {chunkX, chunkZ};
-}
-
-Block World::getBlockLocal(ChunkCoord chunkCoords, glm::vec3 blockPos)
-{
-    auto chunkPtr = chunkManager_.getChunk(chunkCoords);
-    if (!chunkPtr)
-    {
-        static Block airBlock;
-        return airBlock;
-    }
-    return chunkPtr->getBlockLocal(blockPos);
 }
 
 glm::ivec3 World::getBlockLocalPosition(glm::ivec3 worldPos) const
@@ -245,7 +236,7 @@ Block *World::getBlockGlobal(const glm::ivec3 worldPos) const
     auto chunkPtr = chunkManager_.getChunk(chunkCoord);
     if (chunkPtr)
     {
-        return &chunkPtr->getBlockLocal(localBlockPos);
+        return chunkPtr->getBlockLocal(localBlockPos);
     }
     else
     {

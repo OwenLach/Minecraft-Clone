@@ -36,6 +36,15 @@ public:
     void removeBlockAt(glm::ivec3 pos);
     void setBlockAt(glm::ivec3 pos, BlockType type);
 
+    // Getters/Setters
+    std::vector<Block> &getBlocks();
+    ChunkMesh &getMesh();
+    void setMeshData(MeshData &newMeshData);
+    const ChunkCoord getCoord() const;
+    const BoundingBox getBoundingBox() const;
+    const TextureAtlas &getTextureAtlasRef() const;
+    Block *getBlockLocal(const glm::ivec3 &pos);
+
     // State
     ChunkState getState() const;
     void setState(ChunkState newState);
@@ -43,15 +52,8 @@ public:
     bool isProcessing();
     bool canRemesh();
 
-    // Getters/Setters
-    ChunkMesh &getMesh();
-    void setMeshData(MeshData &newMeshData);
-    const ChunkCoord getCoord() const;
-    const BoundingBox getBoundingBox() const;
-    const TextureAtlas &getTextureAtlasRef() const;
-    Block &getBlockLocal(const glm::ivec3 &pos);
-
-    inline bool blockPosInChunkBounds(const glm::ivec3 &pos) const
+    static inline size_t getBlockIndex(const glm::ivec3 &pos) { return pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y); }
+    static inline bool blockPosInChunkBounds(const glm::ivec3 &pos)
     {
         return pos.x >= 0 && pos.x < Constants::CHUNK_SIZE_X &&
                pos.y >= 0 && pos.y < Constants::CHUNK_SIZE_Y &&
@@ -67,6 +69,4 @@ private:
     BoundingBox boundingBox_;
     TerrainGenerator terrainGen_;
     TextureAtlas &textureAtlas_;
-
-    inline size_t getBlockIndex(const glm::ivec3 &pos) const;
 };

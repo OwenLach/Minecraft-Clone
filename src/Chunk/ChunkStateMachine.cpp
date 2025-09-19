@@ -25,23 +25,31 @@ bool ChunkStateMachine::canTransitionTo(ChunkState newState) const
 
     case ChunkState::LIGHT_READY:
         return newState == ChunkState::MESH_GENERATING ||
+               newState == ChunkState::NEEDS_LIGHT_UPDATE ||
                newState == ChunkState::UNLOADING;
 
     case ChunkState::MESH_GENERATING:
         return newState == ChunkState::MESH_READY ||
+               newState == ChunkState::NEEDS_LIGHT_UPDATE ||
                newState == ChunkState::UNLOADING;
 
     case ChunkState::MESH_READY:
         return newState == ChunkState::LOADED ||
                newState == ChunkState::UNLOADING ||
+               newState == ChunkState::NEEDS_LIGHT_UPDATE ||
                newState == ChunkState::NEEDS_MESH_REGEN;
 
     case ChunkState::LOADED:
         return newState == ChunkState::NEEDS_MESH_REGEN ||
+               newState == ChunkState::NEEDS_LIGHT_UPDATE ||
                newState == ChunkState::UNLOADING;
 
     case ChunkState::UNLOADING:
         return newState == ChunkState::EMPTY;
+
+    case ChunkState::NEEDS_LIGHT_UPDATE:
+        return newState == ChunkState::LIGHT_PROPOGATING ||
+               newState == ChunkState::UNLOADING;
 
     case ChunkState::NEEDS_MESH_REGEN:
         return newState == ChunkState::MESH_GENERATING ||
@@ -109,6 +117,8 @@ const char *ChunkStateMachine::toString(ChunkState state)
         return "LOADED";
     case ChunkState::UNLOADING:
         return "UNLOADING";
+    case ChunkState::NEEDS_LIGHT_UPDATE:
+        return "NEEDS LIGHT UPDATE";
     case ChunkState::NEEDS_MESH_REGEN:
         return "NEEDS_MESH_REGEN";
     default:

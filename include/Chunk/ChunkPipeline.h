@@ -16,15 +16,12 @@ class ChunkPipeline
 public:
     ChunkPipeline();
     void init(ChunkManager *chunkManager, LightSystem *lightSystem);
-    // Terrain Gen
     void generateTerrain(std::shared_ptr<Chunk> chunk);
-    // Lighting
     void propogateLight(std::shared_ptr<Chunk> chunk);
-    // Meshing
     void queueInitialMesh(std::shared_ptr<Chunk> chunk);
     void queueRemesh(std::shared_ptr<Chunk> chunk);
     void processMeshes();
-    // Uploading -- Must be called from Main thread
+    // Must be called from Main thread
     void processGPUUploads();
 
 private:

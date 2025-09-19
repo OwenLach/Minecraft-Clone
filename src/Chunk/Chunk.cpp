@@ -23,19 +23,21 @@ Chunk::Chunk(Shader &chunkShader, TextureAtlas &atlas, ChunkCoord pos)
 
 void Chunk::generateTerrain()
 {
-    for (int x = 0; x < Constants::CHUNK_SIZE_X; x++)
+    using namespace Constants;
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
     {
-        for (int z = 0; z < Constants::CHUNK_SIZE_Z; z++)
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
         {
-            for (int y = 0; y < Constants::CHUNK_SIZE_Y; y++)
+            for (int y = 0; y < CHUNK_SIZE_Y; y++)
             {
 
-                float worldX = chunkCoord_.x * Constants::CHUNK_SIZE_X + x;
-                float worldZ = chunkCoord_.z * Constants::CHUNK_SIZE_Z + z;
+                float worldX = chunkCoord_.x * CHUNK_SIZE_X + x;
+                float worldZ = chunkCoord_.z * CHUNK_SIZE_Z + z;
 
                 float terrainNoise = terrainGen_.getTerrainNoise(worldX, worldZ); // [0 - 1]
                 float centeredNoise = terrainNoise - 0.5f;                        // -0.5 to 0.5
-                int height = Constants::TERRAIN_BASE_HEIGHT + (int)(centeredNoise * Constants::TERRAIN_HEIGHT_VARIATION * 2.0f);
+                int height = TERRAIN_BASE_HEIGHT + (int)(centeredNoise * TERRAIN_HEIGHT_VARIATION * 2.0f);
 
                 BlockType type;
                 if (y > height)
@@ -46,7 +48,7 @@ void Chunk::generateTerrain()
                 {
                     type = BlockType::Grass;
                 }
-                else if (y < height && y > Constants::STONE_LEVEL)
+                else if (y < height && y > STONE_LEVEL)
                 {
                     type = BlockType::Dirt;
                 }
@@ -57,12 +59,8 @@ void Chunk::generateTerrain()
 
                 // Cave generation
                 float caveVal = terrainGen_.getCaveNoise(worldX, (float)y, worldZ);
-                if (y < height - 5 &&
-                    caveVal > Constants::CAVE_THRESHOLD &&
-                    y > 0)
-                {
+                if (y <= height && caveVal > CAVE_THRESHOLD && y > 0)
                     type = BlockType::Air;
-                }
 
                 glm::ivec3 pos = {x, y, z};
                 const size_t index = getBlockIndex(pos);
@@ -84,22 +82,40 @@ void Chunk::setBlockAt(glm::ivec3 pos, BlockType type)
     blocks_[index] = Block(type, pos);
 }
 
-Block &Chunk::getBlockLocal(const glm::ivec3 &pos)
+Block *Chunk::getBlockLocal(const glm::ivec3 &pos)
 {
     if (!blockPosInChunkBounds(pos))
-    {
-        // Out of bounds — return a static air block
-        static Block airBlock(BlockType::Air, glm::vec3(0));
-        return airBlock;
-    }
+        return nullptr;
 
     const size_t index = getBlockIndex(pos);
-    return blocks_[index];
+    return &blocks_[index];
 }
 
-inline size_t Chunk::getBlockIndex(const glm::ivec3 &pos) const
+std::vector<Block> &Chunk::getBlocks()
 {
-    return pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y);
+    return blocks_;
+}
+
+ChunkMesh &Chunk::getMesh()
+{
+    return mesh_;
+}
+
+void Chunk::setMeshData(MeshData &newMeshData)
+{
+    mesh_.meshData_ = newMeshData;
+    mesh_.setMeshValid();
+}
+
+const ChunkCoord Chunk::getCoord() const
+
+{
+    return chunkCoord_;
+}
+
+const BoundingBox Chunk::getBoundingBox() const
+{
+    return boundingBox_;
 }
 
 ChunkState Chunk::getState() const
@@ -125,26 +141,4 @@ bool Chunk::isProcessing()
 bool Chunk::canRemesh()
 {
     return stateMachine_.canRemesh();
-}
-
-ChunkMesh &Chunk::getMesh()
-{
-    return mesh_;
-}
-
-void Chunk::setMeshData(MeshData &newMeshData)
-{
-    mesh_.meshData_ = newMeshData;
-    mesh_.setMeshValid();
-}
-
-const ChunkCoord Chunk::getCoord() const
-
-{
-    return chunkCoord_;
-}
-
-const BoundingBox Chunk::getBoundingBox() const
-{
-    return boundingBox_;
 }

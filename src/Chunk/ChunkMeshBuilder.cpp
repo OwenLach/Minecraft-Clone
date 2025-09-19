@@ -25,8 +25,12 @@ MeshData &ChunkMeshBuilder::buildMesh()
             for (int z = 0; z < CHUNK_SIZE_Z; z++)
             {
                 glm::ivec3 pos = glm::ivec3(x, y, z);
-                Block &block = chunk_->getBlockLocal(pos);
+                Block *blockPtr = chunk_->getBlockLocal(pos);
 
+                if (!blockPtr)
+                    std::cout << "BlockPtr is null in ChunkMeshBulider::buildMesh()" << std::endl;
+
+                Block &block = *blockPtr;
                 if (block.type == BlockType::Air)
                     continue;
                 if (isBlockHiddenByNeighbors(pos))
@@ -126,9 +130,9 @@ Block *ChunkMeshBuilder::getNeighborBlock(const glm::ivec3 blockPos, const glm::
     const glm::ivec3 neighborLocalPos = blockPos + offset;
 
     // if it's in the chunk, just get it
-    if (chunk_->blockPosInChunkBounds(neighborLocalPos))
+    if (Chunk::blockPosInChunkBounds(neighborLocalPos))
     {
-        return &chunk_->getBlockLocal(neighborLocalPos);
+        return chunk_->getBlockLocal(neighborLocalPos);
     }
     else
     {
@@ -140,7 +144,7 @@ Block *ChunkMeshBuilder::getNeighborBlock(const glm::ivec3 blockPos, const glm::
             if (westChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x + Constants::CHUNK_SIZE_X, neighborLocalPos.y, neighborLocalPos.z};
-                return &westChunk->getBlockLocal(localPosInNeighbor);
+                return westChunk->getBlockLocal(localPosInNeighbor);
             }
         }
         // Check East neighbor (+X direction)
@@ -151,7 +155,7 @@ Block *ChunkMeshBuilder::getNeighborBlock(const glm::ivec3 blockPos, const glm::
             if (eastChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x - Constants::CHUNK_SIZE_X, neighborLocalPos.y, neighborLocalPos.z};
-                return &eastChunk->getBlockLocal(localPosInNeighbor);
+                return eastChunk->getBlockLocal(localPosInNeighbor);
             }
         }
         // Check South neighbor (-Z direction)
@@ -162,7 +166,7 @@ Block *ChunkMeshBuilder::getNeighborBlock(const glm::ivec3 blockPos, const glm::
             if (southChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z + Constants::CHUNK_SIZE_Z};
-                return &southChunk->getBlockLocal(localPosInNeighbor);
+                return southChunk->getBlockLocal(localPosInNeighbor);
             }
         }
         // Check North neighbor (+Z direction)
@@ -173,7 +177,7 @@ Block *ChunkMeshBuilder::getNeighborBlock(const glm::ivec3 blockPos, const glm::
             if (northChunk)
             {
                 glm::ivec3 localPosInNeighbor = {neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z - Constants::CHUNK_SIZE_Z};
-                return &northChunk->getBlockLocal(localPosInNeighbor);
+                return northChunk->getBlockLocal(localPosInNeighbor);
             }
         }
 
@@ -188,9 +192,9 @@ bool ChunkMeshBuilder::isBlockHiddenByNeighbors(const glm::ivec3 &pos)
     for (const auto &offset : BlockFaceData::FACE_OFFSETS)
     {
         glm::ivec3 neighborPos = pos + offset;
-        if (chunk_->blockPosInChunkBounds(neighborPos))
+        if (Chunk::blockPosInChunkBounds(neighborPos))
         {
-            if (isTransparent(chunk_->getBlockLocal(neighborPos).type))
+            if (isTransparent(chunk_->getBlockLocal(neighborPos)->type))
             {
                 return false;
             }

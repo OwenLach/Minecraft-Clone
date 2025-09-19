@@ -49,24 +49,31 @@ void ChunkManager::update()
 
         ChunkState state = chunk->getState();
 
+        // IMPORTANT: Set state immediately to prevent re-queueing
         // Scan for chunks that are ready for light propogation
         if (state == ChunkState::TERRAIN_READY && allNeighborsTerrainReady(pos))
         {
-            // IMPORTANT: Set state immediately to prevent re-queueing
             chunk->setState(ChunkState::LIGHT_PROPOGATING);
             pipeline_->propogateLight(chunk);
         }
         // Scan for chunks ready for initail mesh generation
         else if (state == ChunkState::LIGHT_READY && allNeighborsLightReady(pos))
         {
-            // IMPORTANT: Set state immediately to prevent re-queueing
             chunk->setState(ChunkState::MESH_GENERATING);
             pipeline_->queueInitialMesh(chunk);
+        }
+        // Scan for chunks that need lighting updated
+        else if (state == ChunkState::NEEDS_LIGHT_UPDATE)
+        {
+
+            chunk->setState(ChunkState::LIGHT_PROPOGATING);
+            pipeline_->propogateLight(chunk);
         }
         // Scan for chunks that need a remesh
         else if (state == ChunkState::NEEDS_MESH_REGEN && allNeighborsTerrainReady(pos))
         {
-            chunk->setState(ChunkState::LIGHT_PROPOGATING);
+            // chunk->setState(ChunkState::LIGHT_PROPOGATING);
+            chunk->setState(ChunkState::MESH_GENERATING);
             pipeline_->queueRemesh(chunk);
         }
     }
@@ -97,16 +104,42 @@ void ChunkManager::renderChunk(std::shared_ptr<Chunk> chunk, const ChunkCoord &p
         mesh.render(pos);
 }
 
-const TextureAtlas &ChunkManager::getTextureAtlasRef() const
+const std::array<std::shared_ptr<Chunk>, 4> ChunkManager::getChunkNeighborsFromCache(const ChunkCoord &center)
 {
-    return textureAtlas_;
+    std::array<std::weak_ptr<Chunk>, 4> weakPtrsArr;
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex_);
+
+        auto it = neighborCache_.find(center);
+        // If its in the cache copy the weak pointers and handle outside of lock
+        if (it != neighborCache_.end())
+        {
+            for (size_t i = 0; i < 4; i++)
+                weakPtrsArr[i] = it->second[i];
+        }
+        // Otherwise get copy shared_ptrs from ChunkManager as weakptrs, cache them, and return them
+        else
+        {
+            auto neighbors = getChunkNeighbors(center);
+            for (size_t i = 0; i < 4; i++)
+                weakPtrsArr[i] = neighbors[i];
+            neighborCache_[center] = weakPtrsArr;
+            return neighbors;
+        }
+    }
+
+    // Convert to shared_ptrs and return by value
+    std::array<std::shared_ptr<Chunk>, 4> returnArray;
+    for (size_t i = 0; i < 4; i++)
+        returnArray[i] = weakPtrsArr[i].lock();
+
+    return returnArray;
 }
 
-std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> ChunkManager::getLoadedChunksCopy() const
+const TextureAtlas &ChunkManager::getTextureAtlasRef() const
 
 {
-    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
-    return loadedChunks_;
+    return textureAtlas_;
 }
 
 const std::shared_ptr<Chunk> ChunkManager::getChunk(const ChunkCoord &coord) const
@@ -128,7 +161,6 @@ const std::shared_ptr<Chunk> ChunkManager::getChunk(const ChunkCoord &coord) con
 std::array<std::shared_ptr<Chunk>, 4> ChunkManager::getChunkNeighbors(const ChunkCoord &coord)
 {
     // Acquire a shared lock for thread-safe read access to loadedChunks_
-
     const std::array<ChunkCoord, 4> neighborCoords = {{
         {coord.x, coord.z + 1}, // North
         {coord.x, coord.z - 1}, // South
@@ -151,11 +183,11 @@ std::array<std::shared_ptr<Chunk>, 4> ChunkManager::getChunkNeighbors(const Chun
 
 void ChunkManager::markNeighborsForMeshRegeneration(const ChunkCoord &coord)
 {
+    std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
+
     auto originalChunk = getChunk(coord);
     if (!originalChunk || originalChunk->getState() < ChunkState::TERRAIN_READY)
-    {
         return; // Don't mark neighbors if this chunk isn't ready
-    }
 
     for (const auto &n_chunkPtr : getChunkNeighbors(coord))
     {

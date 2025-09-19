@@ -12,6 +12,8 @@ uniform sampler2D texture1;
 void main()
 {	
 	vec4 textureColor = texture(texture1, TexCoord);
-	textureColor.rgb *= AO * Skylight;  
+	// Blocks with Skylight 0 get mininmun light val
+	float lightLevel = max(Skylight, 0.15) * AO;
+	textureColor.rgb *= lightLevel;  
 	FragColor = textureColor;
 }

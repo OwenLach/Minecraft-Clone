@@ -26,9 +26,10 @@ void ChunkPipeline::init(ChunkManager *chunkManager, LightSystem *lightSystem)
 void ChunkPipeline::generateTerrain(std::shared_ptr<Chunk> chunk)
 {
     threadPool_.enqueue([this, chunk]() { //
+        // ScopedTimer timer("generateTerrain()");
         chunk->generateTerrain();
+        lightSystem_->seedInitialSkylight(chunk);
         chunk->setState(ChunkState::TERRAIN_READY);
-        // chunkManager_->markNeighborsForMeshRegeneration(chunk->getCoord());
     });
 }
 
@@ -37,9 +38,7 @@ void ChunkPipeline::propogateLight(std::shared_ptr<Chunk> chunk)
     threadPool_.enqueue([this, chunk]() { //
         lightSystem_->propagateSkylight(chunk);
         chunk->setState(ChunkState::LIGHT_READY);
-
-        // Maybe put here, update neighbors meshes
-        // chunkManager_->markNeighborsForMeshRegeneration(chunk->getCoord());
+        lightSystem_->updateNeighborLights(chunk);
     });
 }
 
@@ -76,8 +75,8 @@ void ChunkPipeline::processMeshes()
     {
         std::shared_ptr<Chunk> chunk = remeshQueue_.front();
         remeshQueue_.pop();
-        // generateMesh(chunk);
-        propogateLight(chunk);
+        generateMesh(chunk);
+        // propogateLight(chunk);
         meshed++;
     }
 }
