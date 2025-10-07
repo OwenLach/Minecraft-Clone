@@ -127,18 +127,3 @@ void Chunk::setState(ChunkState newState)
 {
     stateMachine_.setState(newState);
 }
-
-bool Chunk::canUnload() const
-{
-    return stateMachine_.canUnload();
-}
-
-bool Chunk::isProcessing()
-{
-    return stateMachine_.isProcessing();
-}
-
-bool Chunk::canRemesh()
-{
-    return stateMachine_.canRemesh();
-}

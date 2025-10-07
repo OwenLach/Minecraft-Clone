@@ -3,21 +3,24 @@
 #include "Chunk/Chunk.h"
 #include "Chunk/ChunkCoord.h"
 #include "Block/Block.h"
-#include "ThreadPool.h"
 #include "Shader.h"
 #include "TextureAtlas.h"
 #include "Camera.h"
 
 #include <unordered_map>
+#include <unordered_set>
 #include <queue>
-#include <mutex>
-#include <shared_mutex>
-#include <atomic>
 #include <chrono>
 #include <vector>
 #include <memory>
 
 class ChunkPipeline;
+
+struct StateChangeEvent
+{
+    std::shared_ptr<Chunk> chunk;
+    ChunkState newState;
+};
 
 class ChunkManager
 {
@@ -30,44 +33,45 @@ public:
     void renderAllChunks();
     void renderChunk(std::shared_ptr<Chunk> chunk, const ChunkCoord &pos);
     void update();
+    void notifyStateChange(StateChangeEvent event);
+    void notifyDependentNeighbors(std::shared_ptr<Chunk> chunk, ChunkState newState);
 
-    // Use visitor pattern
     template <typename Visitor>
     void forEachChunk(Visitor &&v)
     {
-        // Lock first
-        std::shared_lock<std::shared_mutex> lock(loadedChunksMutex_);
-        // Apply visitor function, lambda, ect.. on each coord, chunk pair
-        for (const auto [coord, chunk] : loadedChunks_)
+        for (const auto [coord, chunk] : chunks_)
         {
             if (!chunk)
                 continue;
             v(coord, chunk);
         }
     }
-    const std::array<std::shared_ptr<Chunk>, 4> getChunkNeighborsFromCache(const ChunkCoord &center);
+
     const TextureAtlas &getTextureAtlasRef() const;
     const std::shared_ptr<Chunk> getChunk(const ChunkCoord &coord) const;
     std::array<std::shared_ptr<Chunk>, 4> getChunkNeighbors(const ChunkCoord &coord);
-    void markNeighborsForMeshRegeneration(const ChunkCoord &coord);
 
 private:
+    std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> chunks_;
+
+    std::unordered_set<std::shared_ptr<Chunk>> readyForTerrainGen_;
+    std::unordered_set<std::shared_ptr<Chunk>> readyForInitLighting_;
+    std::unordered_set<std::shared_ptr<Chunk>> readyForFinalLighting_;
+    std::unordered_set<std::shared_ptr<Chunk>> readyForMeshing_;
+    std::unordered_set<std::shared_ptr<Chunk>> readyForUpload_;
+    std::unordered_set<std::shared_ptr<Chunk>> readyForRemesh_;
+
+    std::queue<StateChangeEvent> stateChangeQueue_;
+
     Camera &camera_;
     Shader chunkShader_;
     TextureAtlas textureAtlas_;
     ChunkPipeline *pipeline_;
 
-    std::unordered_map<ChunkCoord, std::shared_ptr<Chunk>> loadedChunks_;
-    mutable std::shared_mutex loadedChunksMutex_;
+    void processStateChanges();
+    void processBatches();
 
-    std::unordered_map<ChunkCoord, std::array<std::weak_ptr<Chunk>, 4>> neighborCache_;
-    std::mutex cacheMutex_;
-
-    void processLighting();
-    void processMeshing();
-
-    bool allNeighborsTerrainReady(const ChunkCoord &coord);
-    bool allNeighborsLightReady(const ChunkCoord &coord);
+    bool allNeighborsStateReady(const ChunkCoord &coord, ChunkState state);
 
     static inline bool isInRenderDistance(int chunkX, int chunkZ, int playerX, int playerZ)
     {

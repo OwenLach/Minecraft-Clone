@@ -1,9 +1,6 @@
 #pragma once
 
-#include "ThreadPool.h"
 #include <memory>
-#include <queue>
-#include <mutex>
 
 class Chunk;
 class ChunkManager;
@@ -17,29 +14,12 @@ public:
     ChunkPipeline();
     void init(ChunkManager *chunkManager, LightSystem *lightSystem);
     void generateTerrain(std::shared_ptr<Chunk> chunk);
+    void seedInitialLight(std::shared_ptr<Chunk> chunk);
     void propogateLight(std::shared_ptr<Chunk> chunk);
-    void queueInitialMesh(std::shared_ptr<Chunk> chunk);
-    void queueRemesh(std::shared_ptr<Chunk> chunk);
-    void processMeshes();
-    // Must be called from Main thread
-    void processGPUUploads();
-
-private:
-    ThreadPool threadPool_;
-    ChunkManager *chunkManager_;
-    LightSystem *lightSystem_;
-
-    // Lighting
-    std::queue<std::shared_ptr<Chunk>> lightQueue_;
-    std::mutex lightMutex_;
-    // Meshing
-    std::queue<std::shared_ptr<Chunk>> initialMeshQueue_;
-    std::queue<std::shared_ptr<Chunk>> remeshQueue_;
-    std::mutex meshMutex_;
-    // Uploading
-    std::queue<std::shared_ptr<Chunk>> gpuUploadQueue_;
-    std::mutex uploadMutex_;
-
     void generateMesh(std::shared_ptr<Chunk> chunk);
     void uploadMeshToGPU(std::shared_ptr<Chunk> chunk);
+
+private:
+    ChunkManager *chunkManager_;
+    LightSystem *lightSystem_;
 };

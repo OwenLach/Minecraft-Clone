@@ -41,3 +41,6 @@
 # === macOS/Linux specific ===
 .DS_Store
 Thumbs.db
+
+libs/glm/
+libs/imgui/

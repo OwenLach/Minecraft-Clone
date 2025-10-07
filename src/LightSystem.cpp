@@ -9,91 +9,63 @@
 #include <glm/glm.hpp>
 
 #include <memory>
-#include <unordered_map>
 #include <iostream>
 #include <queue>
 #include <array>
-#include <cassert>
-#include <mutex>
 
 LightSystem::LightSystem(World *world, ChunkManager *manager) : world_(world), chunkManager_(manager)
 {
 }
 
-void LightSystem::propagateSkylight(std::shared_ptr<Chunk> chunk)
+void LightSystem::updateBorderLighting(std::shared_ptr<Chunk> chunk)
 {
     using namespace Constants;
-    // ScopedTimer timer("propogateLight()");
 
-    auto &blocks = chunk->getBlocks();
+    std::queue<LightNode> lightQueue;
+    seedFromNeighborChunks(chunk, lightQueue);
 
-    seedFromNeighborChunks(chunk);
-
-    while (true)
+    while (!lightQueue.empty())
     {
-        LightNode currNode;
-        bool hasNode = false;
+        LightNode currNode = lightQueue.front();
+        lightQueue.pop();
 
+        // skip if chunk doesn't exist
+        if (!currNode.chunk)
         {
-            std::lock_guard<std::mutex> lock(lightMutex_);
-            if (!lightQueue_.empty())
-            {
-                currNode = lightQueue_.front();
-                lightQueue_.pop();
-                hasNode = true;
-            }
+            std::cout << "CHUNK DOESN'T EXIST" << std::endl;
+            continue;
         }
-
-        if (!hasNode)
-            break;
 
         Block &currBlock = *currNode.chunk->getBlockLocal(currNode.localPos);
         for (const auto &dir : directions)
         {
             LightNode nNode{currNode.chunk, currNode.localPos + dir};
 
-            // Check if block is out of Y bounds first
-            if (nNode.localPos.y < 0 || nNode.localPos.y >= CHUNK_SIZE_Y)
-                continue;
-
-            // If local position isn't in chunk bounds, get the correct chunk and localPos
+            // If neighbor position isn't in chunk bounds skip
             if (!Chunk::blockPosInChunkBounds(nNode.localPos))
-                getNodeFromNeighbor(nNode);
-
-            if (!nNode.chunk)
-            {
-                // std::cout << "CHUNK DOESN'T EXIST" << std::endl;
                 continue;
-            }
-
-            assert(Chunk::blockPosInChunkBounds(nNode.localPos));
 
             Block *nBlockPtr = nNode.chunk->getBlockLocal(nNode.localPos);
-            if (!nBlockPtr)
-            {
-                assert(false && "BLOCK DOESN'T EXIST, THIS SHOULD NOT HAPPEN");
+
+            if (!isTransparent(nBlockPtr->type))
                 continue;
+
+            int potential_new_light;
+            // Light doesn't dim downwards
+            if (dir.y == -1)
+            {
+                potential_new_light = currBlock.skylight;
+            }
+            // Regular for all other directions
+            else
+            {
+                potential_new_light = currBlock.skylight - 1;
             }
 
-            if (isTransparent(nBlockPtr->type))
+            if (potential_new_light > nBlockPtr->skylight)
             {
-                int potential_new_light;
-                // Light doesn't dim downwards
-                if (dir.y == -1)
-                {
-                    potential_new_light = currBlock.skylight;
-                }
-                // Regular for all other directions
-                else
-                {
-                    potential_new_light = currBlock.skylight - 1;
-                }
-
-                if (potential_new_light > nBlockPtr->skylight)
-                {
-                    nBlockPtr->skylight = static_cast<uint8_t>(potential_new_light);
-                    addToQueue(nNode);
-                }
+                nBlockPtr->skylight = static_cast<uint8_t>(potential_new_light);
+                lightQueue.push(nNode);
             }
         }
     }
@@ -103,8 +75,10 @@ void LightSystem::seedInitialSkylight(std::shared_ptr<Chunk> chunk)
 {
     using namespace Constants;
 
+    std::queue<LightNode> lightQueue;
     auto &blocks = chunk->getBlocks();
 
+    // 1. Set all air blocks in column to light level 15 and push to queue until the first solid block is reached
     for (int x = 0; x < CHUNK_SIZE_X; x++)
     {
         for (int z = 0; z < CHUNK_SIZE_Z; z++)
@@ -114,39 +88,77 @@ void LightSystem::seedInitialSkylight(std::shared_ptr<Chunk> chunk)
                 int index = Chunk::getBlockIndex({x, y, z});
                 Block &block = blocks[index];
 
-                // Stop when first solid block reached
                 if (!isTransparent(block.type))
                     break;
 
-                // Set all air blocks in column to light level 15 until the first solid block is reached
                 block.skylight = 15;
-                addToQueue({chunk, {x, y, z}});
+                lightQueue.push({chunk, {x, y, z}});
+            }
+        }
+    }
+
+    // 2. Progate the light within current chunk only
+    while (!lightQueue.empty())
+    {
+        LightNode currNode = lightQueue.front();
+        lightQueue.pop();
+
+        if (!currNode.chunk)
+        {
+            std::cout << "CHUNK DOESN'T EXIST" << std::endl;
+            continue;
+        }
+
+        Block &currBlock = *currNode.chunk->getBlockLocal(currNode.localPos);
+        for (const auto &dir : directions)
+        {
+            // Don't go up on initial skylight
+            if (dir.y == 1)
+                continue;
+
+            glm::ivec3 nPos = currNode.localPos + dir;
+
+            // If local position isn't in chunk bounds, skip
+            if (!Chunk::blockPosInChunkBounds(nPos))
+                continue;
+
+            Block *nBlockPtr = chunk->getBlockLocal(nPos);
+
+            if (!isTransparent(nBlockPtr->type))
+                continue;
+
+            int potential_new_light;
+            // Light doesn't dim downwards
+            if (dir.y == -1)
+            {
+                potential_new_light = currBlock.skylight;
+            }
+            // Regular for all other directions
+            else
+            {
+                potential_new_light = currBlock.skylight - 1;
+            }
+
+            if (potential_new_light > nBlockPtr->skylight)
+            {
+                nBlockPtr->skylight = static_cast<uint8_t>(potential_new_light);
+                lightQueue.push({chunk, nPos});
             }
         }
     }
 }
 
-void LightSystem::updateNeighborLights(std::shared_ptr<Chunk> chunk)
-{
-    auto neighbors = chunkManager_->getChunkNeighborsFromCache(chunk->getCoord());
-    for (const auto &n : neighbors)
-    {
-        if (n && n->getState() == ChunkState::LOADED)
-            n->setState(ChunkState::NEEDS_LIGHT_UPDATE);
-    }
-}
-
-void LightSystem::seedFromNeighborChunks(std::shared_ptr<Chunk> chunk)
+void LightSystem::seedFromNeighborChunks(std::shared_ptr<Chunk> chunk, std::queue<LightNode> &lightQueue)
 {
     using namespace Constants;
 
-    auto neighbors = chunkManager_->getChunkNeighborsFromCache(chunk->getCoord());
+    auto neighbors = chunkManager_->getChunkNeighbors(chunk->getCoord());
     auto westChunk = neighbors[3];
     auto eastChunk = neighbors[2];
     auto southChunk = neighbors[1];
     auto northChunk = neighbors[0];
 
-    auto currBlocks = chunk->getBlocks();
+    auto &currBlocks = chunk->getBlocks();
 
     if (westChunk)
     {
@@ -166,10 +178,12 @@ void LightSystem::seedFromNeighborChunks(std::shared_ptr<Chunk> chunk)
                     continue;
 
                 uint8_t potential_new_level = nBlock.skylight - 1;
-                if (isTransparent(currBlock.type) && (potential_new_level > currBlock.skylight))
+                if (isTransparent(currBlock.type) &&
+                    potential_new_level > currBlock.skylight &&
+                    potential_new_level > 0)
                 {
                     currBlock.skylight = potential_new_level;
-                    addToQueue({chunk, {0, y, z}});
+                    lightQueue.push({chunk, {0, y, z}});
                 }
             }
         }
@@ -193,10 +207,12 @@ void LightSystem::seedFromNeighborChunks(std::shared_ptr<Chunk> chunk)
                     continue;
 
                 uint8_t potential_new_level = nBlock.skylight - 1;
-                if (isTransparent(currBlock.type) && (potential_new_level > currBlock.skylight))
+                if (isTransparent(currBlock.type) &&
+                    potential_new_level > currBlock.skylight &&
+                    potential_new_level > 0)
                 {
                     currBlock.skylight = potential_new_level;
-                    addToQueue({chunk, {CHUNK_SIZE_X - 1, y, z}});
+                    lightQueue.push({chunk, {CHUNK_SIZE_X - 1, y, z}});
                 }
             }
         }
@@ -220,10 +236,12 @@ void LightSystem::seedFromNeighborChunks(std::shared_ptr<Chunk> chunk)
                     continue;
 
                 uint8_t potential_new_level = nBlock.skylight - 1;
-                if (isTransparent(currBlock.type) && (potential_new_level > currBlock.skylight))
+                if (isTransparent(currBlock.type) &&
+                    potential_new_level > currBlock.skylight &&
+                    potential_new_level > 0)
                 {
                     currBlock.skylight = potential_new_level;
-                    addToQueue({chunk, {x, y, 0}});
+                    lightQueue.push({chunk, {x, y, 0}});
                 }
             }
         }
@@ -247,97 +265,20 @@ void LightSystem::seedFromNeighborChunks(std::shared_ptr<Chunk> chunk)
                     continue;
 
                 uint8_t potential_new_level = nBlock.skylight - 1;
-                if (isTransparent(currBlock.type) && (potential_new_level > currBlock.skylight))
+                if (isTransparent(currBlock.type) &&
+                    potential_new_level > currBlock.skylight &&
+                    potential_new_level > 0)
                 {
                     currBlock.skylight = potential_new_level;
-                    addToQueue({chunk, {x, y, CHUNK_SIZE_Z - 1}});
+                    lightQueue.push({chunk, {x, y, CHUNK_SIZE_Z - 1}});
                 }
             }
         }
     }
 }
 
-void LightSystem::getNodeFromNeighbor(LightNode &n)
-{
-    using namespace Constants;
-
-    auto nLocalPos = n.localPos;
-    ChunkCoord originCoord = n.chunk->getCoord();
-
-    // neighbors[0] = North neighbor
-    // neighbors[1] = South neighbor
-    // neighbors[2] = East neighbor
-    // neighbors[3] = West neighbor
-    if (nLocalPos.x < 0 && nLocalPos.z >= 0 && nLocalPos.z < CHUNK_SIZE_Z)
-    {
-        auto westChunk = chunkManager_->getChunkNeighborsFromCache(originCoord)[3];
-        if (westChunk)
-        {
-            n.chunk = westChunk;
-            n.localPos = {nLocalPos.x + CHUNK_SIZE_X, nLocalPos.y, nLocalPos.z};
-        }
-        else
-        {
-            n.chunk = nullptr;
-        }
-    }
-    // Check East neighbor (+X direction)
-    else if (nLocalPos.x >= CHUNK_SIZE_X && nLocalPos.z >= 0 && nLocalPos.z < CHUNK_SIZE_Z)
-    {
-        auto eastChunk = chunkManager_->getChunkNeighborsFromCache(originCoord)[2];
-        if (eastChunk)
-        {
-            n.chunk = eastChunk;
-            n.localPos = {nLocalPos.x - CHUNK_SIZE_X, nLocalPos.y, nLocalPos.z};
-        }
-        else
-        {
-            n.chunk = nullptr;
-        }
-    }
-    // Check South neighbor (-Z direction)
-    else if (nLocalPos.z < 0 && nLocalPos.x >= 0 && nLocalPos.x < CHUNK_SIZE_X)
-    {
-        auto southChunk = chunkManager_->getChunkNeighborsFromCache(originCoord)[1];
-        if (southChunk)
-        {
-            n.chunk = southChunk;
-            n.localPos = {nLocalPos.x, nLocalPos.y, nLocalPos.z + CHUNK_SIZE_Z};
-        }
-        else
-        {
-            n.chunk = nullptr;
-        }
-    }
-    // Check North neighbor (+Z direction)
-    else if (nLocalPos.z >= CHUNK_SIZE_Z && nLocalPos.x >= 0 && nLocalPos.x < CHUNK_SIZE_X)
-    {
-        auto northChunk = chunkManager_->getChunkNeighborsFromCache(originCoord)[0];
-        if (northChunk)
-        {
-            n.chunk = northChunk;
-            n.localPos = {nLocalPos.x, nLocalPos.y, nLocalPos.z - CHUNK_SIZE_Z};
-        }
-        else
-        {
-            n.chunk = nullptr;
-        }
-    }
-    else
-    {
-        assert(false && "THIS SHOULD NEVER HAPPEN");
-    }
-}
-
-void LightSystem::addToQueue(const LightNode &n)
-{
-    std::lock_guard<std::mutex> lock(lightMutex_);
-    lightQueue_.push(n);
-}
-
 void LightSystem::clearChunkLightLevels(std::shared_ptr<Chunk> chunk)
 {
-    // ScopedTimer timer("clearChunkLightLevels");
     for (auto &block : chunk->getBlocks())
         block.skylight = 0;
 }

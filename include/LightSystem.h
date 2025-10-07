@@ -5,8 +5,6 @@
 
 #include <array>
 #include <memory>
-#include <unordered_map>
-#include <mutex>
 #include <queue>
 
 #include <glm/glm.hpp>
@@ -26,10 +24,10 @@ class LightSystem
 {
 public:
     LightSystem(World *world, ChunkManager *manager);
-    void propagateSkylight(std::shared_ptr<Chunk> chunk);
-    // Happens right after terrain gen, only sets the inital airblocks above solid ground to 15, does no propogation
+    // Update the chunk's lighting from its neighbors
+    void updateBorderLighting(std::shared_ptr<Chunk> chunk);
+    // Happens right after terrain gen, only propogates light within chunk
     void seedInitialSkylight(std::shared_ptr<Chunk> chunk);
-    void updateNeighborLights(std::shared_ptr<Chunk> chunk);
 
 private:
     World *world_;
@@ -41,14 +39,7 @@ private:
             glm::ivec3(0, 1, 0), glm::ivec3(0, -1, 0),
             glm::ivec3(0, 0, 1), glm::ivec3(0, 0, -1)};
 
-    void seedFromNeighborChunks(std::shared_ptr<Chunk> chunk);
-    void getNodeFromNeighbor(LightNode &n);
-    void addToQueue(const LightNode &n);
+    void seedFromNeighborChunks(std::shared_ptr<Chunk> chunk, std::queue<LightNode> &lightQueue);
     void clearChunkLightLevels(std::shared_ptr<Chunk> chunk);
     inline bool isTransparent(BlockType type) const { return type == BlockType::Air; }
-
-    std::queue<LightNode> lightQueue_;
-    std::mutex lightMutex_;
 };
-
-// two system pass, removal - addition

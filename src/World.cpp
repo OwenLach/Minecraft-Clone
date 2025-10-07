@@ -40,7 +40,6 @@ void World::update()
 void World::render()
 {
     chunkManager_.renderAllChunks();
-
     if (hasTargetBlock_)
     {
         blockOutline_.render(camera_.getViewMatrix(), camera_.getProjectionMatrix(), targetBlockPos_);
@@ -49,57 +48,56 @@ void World::render()
 
 void World::breakBlock()
 {
-    if (raycaster.cast())
-    {
-        glm::ivec3 blockHitPos = raycaster.getHitBlockPosition();
-        auto chunk = chunkManager_.getChunk(worldToChunkCoords(blockHitPos));
-        if (chunk)
-        {
-            chunk->removeBlockAt(getBlockLocalPosition(blockHitPos));
-            chunk->setState(ChunkState::NEEDS_LIGHT_UPDATE);
-        }
-    }
+    // if (raycaster.cast())
+    // {
+    //     glm::ivec3 blockHitPos = raycaster.getHitBlockPosition();
+    //     auto chunk = chunkManager_.getChunk(worldToChunkCoords(blockHitPos));
+    //     if (chunk)
+    //     {
+    //         chunk->removeBlockAt(getBlockLocalPosition(blockHitPos));
+    //         chunk->setState(ChunkState::NEEDS_LIGHT_UPDATE);
+    //     }
+    // }
 }
 
 void World::placeBlock()
 {
-    if (raycaster.cast())
-    {
-        glm::ivec3 blockHitPos = raycaster.getHitBlockPosition();
-        BlockFaces hitFace = raycaster.getHitBlockFace();
-        glm::ivec3 dir;
+    // if (raycaster.cast())
+    // {
+    //     glm::ivec3 blockHitPos = raycaster.getHitBlockPosition();
+    //     BlockFaces hitFace = raycaster.getHitBlockFace();
+    //     glm::ivec3 dir;
 
-        switch (hitFace)
-        {
-        case BlockFaces::Front:
-            dir = glm::ivec3(0, 0, 1);
-            break;
-        case BlockFaces::Back:
-            dir = glm::ivec3(0, 0, -1);
-            break;
-        case BlockFaces::Left:
-            dir = glm::ivec3(-1, 0, 0);
-            break;
-        case BlockFaces::Right:
-            dir = glm::ivec3(1, 0, 0);
-            break;
-        case BlockFaces::Bottom:
-            dir = glm::ivec3(0, -1, 0);
-            break;
-        case BlockFaces::Top:
-            dir = glm::ivec3(0, 1, 0);
-            break;
-        }
+    //     switch (hitFace)
+    //     {
+    //     case BlockFaces::Front:
+    //         dir = glm::ivec3(0, 0, 1);
+    //         break;
+    //     case BlockFaces::Back:
+    //         dir = glm::ivec3(0, 0, -1);
+    //         break;
+    //     case BlockFaces::Left:
+    //         dir = glm::ivec3(-1, 0, 0);
+    //         break;
+    //     case BlockFaces::Right:
+    //         dir = glm::ivec3(1, 0, 0);
+    //         break;
+    //     case BlockFaces::Bottom:
+    //         dir = glm::ivec3(0, -1, 0);
+    //         break;
+    //     case BlockFaces::Top:
+    //         dir = glm::ivec3(0, 1, 0);
+    //         break;
+    //     }
 
-        glm::ivec3 posToPlace = blockHitPos + dir;
-        auto chunk = chunkManager_.getChunk(worldToChunkCoords(posToPlace));
-        if (chunk)
-        {
-            chunk->setBlockAt(getBlockLocalPosition(posToPlace), playerBlockType_);
-            chunk->setState(ChunkState::NEEDS_LIGHT_UPDATE);
-            // chunkManager_.markNeighborsForMeshRegeneration(chunk->getCoord());
-        }
-    }
+    //     glm::ivec3 posToPlace = blockHitPos + dir;
+    //     auto chunk = chunkManager_.getChunk(worldToChunkCoords(posToPlace));
+    //     if (chunk)
+    //     {
+    //         chunk->setBlockAt(getBlockLocalPosition(posToPlace), playerBlockType_);
+    //         chunk->setState(ChunkState::NEEDS_LIGHT_UPDATE);
+    //     }
+    // }
 }
 
 void World::setPlayerBlockType(BlockType type)
@@ -141,20 +139,21 @@ void World::loadNewChunks(ChunkCoord center)
 
 void World::unloadDistantChunks()
 {
-    const ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera_.Position));
-    std::vector<ChunkCoord> chunkCoordsToRemove;
+    // const ChunkCoord playerPos = worldToChunkCoords(glm::ivec3(camera_.Position));
+    // std::vector<ChunkCoord> chunkCoordsToRemove;
 
-    // Pass to chunkManagers visitor function which checks if every coord/chunk pair
-    chunkManager_.forEachChunk([&](const ChunkCoord coord, std::shared_ptr<Chunk> chunk) { //
-        if (!isInRenderDistance(coord.x, coord.z, playerPos.x, playerPos.z) && chunk->canUnload())
-            chunkCoordsToRemove.push_back(coord);
-    });
+    // // Pass to chunkManagers visitor function which checks if every coord/chunk pair
+    // chunkManager_.forEachChunk([&](const ChunkCoord coord, std::shared_ptr<Chunk> chunk) { //
+    //     // if (!isInRenderDistance(coord.x, coord.z, playerPos.x, playerPos.z) && chunk->canUnload())
+    //     if (!isInRenderDistance(coord.x, coord.z, playerPos.x, playerPos.z))
+    //         chunkCoordsToRemove.push_back(coord);
+    // });
 
-    // Remove chunks outside of lock
-    for (const auto &coord : chunkCoordsToRemove)
-    {
-        chunkManager_.removeChunk(coord);
-    }
+    // // Remove chunks outside of lock
+    // for (const auto &coord : chunkCoordsToRemove)
+    // {
+    //     chunkManager_.removeChunk(coord);
+    // }
 }
 
 void World::updateSelectedBlockOutline()
@@ -234,15 +233,7 @@ Block *World::getBlockGlobal(const glm::ivec3 worldPos) const
     auto localBlockPos = getBlockLocalPosition(worldPos);
     ChunkCoord chunkCoord = worldToChunkCoords(worldPos);
     auto chunkPtr = chunkManager_.getChunk(chunkCoord);
-    if (chunkPtr)
-    {
-        return chunkPtr->getBlockLocal(localBlockPos);
-    }
-    else
-    {
-        // return a nullptr if chunk isn't found
-        return nullptr;
-    }
+    return (chunkPtr) ? chunkPtr->getBlockLocal(localBlockPos) : nullptr;
 }
 
 bool World::isBlockSolid(glm::ivec3 blockWorldPos) const

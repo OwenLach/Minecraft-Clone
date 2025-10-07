@@ -48,9 +48,6 @@ public:
     // State
     ChunkState getState() const;
     void setState(ChunkState newState);
-    bool canUnload() const;
-    bool isProcessing();
-    bool canRemesh();
 
     static inline size_t getBlockIndex(const glm::ivec3 &pos) { return pos.x + (pos.y * Constants::CHUNK_SIZE_X) + (pos.z * Constants::CHUNK_SIZE_X * Constants::CHUNK_SIZE_Y); }
     static inline bool blockPosInChunkBounds(const glm::ivec3 &pos)
